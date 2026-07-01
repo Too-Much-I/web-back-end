@@ -17,11 +17,9 @@ public enum ErrorStatus implements BaseErrorCode {
     // Member
     _MEMBER_NOT_FOUND(HttpStatus.FORBIDDEN, "MEMBER_4000", "없는 유저 입니다."),
 
-    // Recipe
-    _RECIPE_SEARCH_FAIL(HttpStatus.BAD_REQUEST, "RECIPE_4000", "레시피 추천에 실패했습니다."),
-    _RECIPE_NOT_FOUND(HttpStatus.BAD_REQUEST, "RECIPE_4001", "존재하지 않는 레시피입니다."),
-    _SCRAP_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "RECIPE_4001", "이미 찜한 레시피입니다."),
-    _SCRAP_NOT_FOUND(HttpStatus.NOT_FOUND, "RECIPE_4004", "찜한 내역이 존재하지 않습니다.");
+    // Exams (새로 추가!)
+    _EXAM_NOT_FOUND(HttpStatus.NOT_FOUND, "EXAM_4004", "해당 모의고사 세션을 찾을 수 없습니다."),
+    _EXAM_PAPER_NOT_FOUND(HttpStatus.NOT_FOUND, "EXAM_4005", "해당 문제지를 찾을 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
