@@ -2,7 +2,6 @@ package web.tosunsaeng.domain.exams.dto;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
 import java.util.List;
 
 public class ExamRequestDTO {
@@ -10,7 +9,7 @@ public class ExamRequestDTO {
     @Getter
     @NoArgsConstructor
     public static class SubmitAudioReq {
-        private String fileKey; // S3에 업로드된 파일의 경로
+        private String fileKey;
     }
 
     @Getter
@@ -36,7 +35,7 @@ public class ExamRequestDTO {
     @Getter
     @NoArgsConstructor
     public static class PartResultDTO {
-        private String part;
+        private Integer part;
         private String questionId;
         private String sttText;
         private String deductionReason;

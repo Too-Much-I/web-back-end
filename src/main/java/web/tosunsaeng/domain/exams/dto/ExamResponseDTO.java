@@ -104,7 +104,7 @@ public class ExamResponseDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PartResultDTO {
-        private String part;
+        private Integer part;
         private String questionId;
         private String audioUrl;
         private String sttText;

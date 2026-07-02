@@ -34,7 +34,7 @@ public class ExamResult {
 
     @Getter @Builder @NoArgsConstructor @AllArgsConstructor
     public static class PartResult {
-        private String part;
+        private Integer part;
         private String questionId; // 음성 파일 매칭을 위한 고유 식별자
         private String sttText;
         private String deductionReason;

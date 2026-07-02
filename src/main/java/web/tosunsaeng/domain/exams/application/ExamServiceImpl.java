@@ -8,9 +8,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import web.tosunsaeng.domain.exams.converter.ExamConverter;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
+import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
+import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.QuestionRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
@@ -41,6 +43,7 @@ public class ExamServiceImpl implements ExamService {
 
     private final QuestionRepository questionRepository;
     private final ExamResultRepository examResultRepository;
+    private final MockExamRepository mockExamRepository;
 
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
@@ -62,67 +65,58 @@ public class ExamServiceImpl implements ExamService {
         return s3Presigner.presignGetObject(presignRequest).url().toString();
     }
 
-    private String getQuestionAudioUrl(String examPaperId, String questionId) {
-        String fileKey = String.format("questions/%s/%s.wav", examPaperId, questionId);
-        return generatePresignedGetUrl(fileKey, 60); // 시험 출제용 (60분)
+    private String getQuestionAudioUrl(String examPaperId, Integer questionNumber) {
+        String fileKey = String.format("questions/%s/q_%d.wav", examPaperId, questionNumber);
+        return generatePresignedGetUrl(fileKey, 60);
     }
 
     private String getDownloadUrl(String examId, String questionId) {
         String fileKey = String.format("temp/%s/%s.wav", examId, questionId);
-        return generatePresignedGetUrl(fileKey, 5); // 결과 확인용 (5분)
+        return generatePresignedGetUrl(fileKey, 5);
     }
 
     // --- 2. 유틸리티 로직: 문제 번호로 토스 파트 번호 계산 ---
-    private String getPartNumber(String questionId) {
-        try {
-            // "q_001", "q1", "1" 등에서 숫자만 추출
-            String numStr = questionId.replaceAll("[^0-9]", "");
-            if (numStr.isEmpty()) return "1"; // 기본값 안전장치
-
-            int qNum = Integer.parseInt(numStr);
-            if (qNum >= 1 && qNum <= 2) return "1";
-            if (qNum >= 3 && qNum <= 4) return "2";
-            if (qNum >= 5 && qNum <= 7) return "3";
-            if (qNum >= 8 && qNum <= 10) return "4";
-            if (qNum == 11) return "5";
-        } catch (Exception e) {
-            log.warn("questionId에서 파트 추출 실패, 기본값 1 할당: {}", questionId);
-        }
-        return "1";
+    private Integer getPartNumber(Integer questionNumber) {
+        if (questionNumber == null) return 1;
+        if (questionNumber >= 1 && questionNumber <= 2) return 1;
+        if (questionNumber >= 3 && questionNumber <= 4) return 2;
+        if (questionNumber >= 5 && questionNumber <= 7) return 3;
+        if (questionNumber >= 8 && questionNumber <= 10) return 4;
+        return 5;
     }
 
     // --- 3. 비즈니스 로직 ---
     @Override
     public ExamResponseDTO.CreateSessionResult createExamSession() {
         String examId = "ex_" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-
         String redisKey = "exam:status:" + examId;
-        // (수정) Enum 사용
+
+        // 1. 상태를 PENDING으로 저장
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
         log.info("새로운 모의고사 세션 생성 완료: {}", examId);
 
-        String targetPaperId = "paper_001";
-        List<Question> questions = questionRepository.findByExamPaperId(targetPaperId);
+        // 2. 전체 모의고사 데이터 조회 (mock_exam_001)
+        // 몽고DB에 저장된 전체 JSON 구조를 불러옵니다.
+        MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_001")
+                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
 
-        if (questions.isEmpty()) {
-            log.warn("MongoDB에 '{}'에 해당하는 문제가 없습니다.", targetPaperId);
-        }
-
-        List<ExamResponseDTO.QuestionDTO> questionDTOs = questions.stream()
-                .map(question -> {
-                    ExamResponseDTO.QuestionDTO dto = ExamConverter.toQuestionDTO(question);
-                    String audioUrl = getQuestionAudioUrl(targetPaperId, String.valueOf(dto.getQuestionNumber()));
-                    dto.setAudioUrl(audioUrl);
+        // 3. 문제 리스트를 DTO로 변환
+        List<ExamResponseDTO.QuestionDTO> questionDTOs = mockExam.getQuestions().stream()
+                .map(q -> {
+                    ExamResponseDTO.QuestionDTO dto = ExamConverter.toQuestionDTO(q);
+                    // S3 URL 매핑 (Integer questionNumber 사용)
+                    dto.setAudioUrl(getQuestionAudioUrl(mockExam.getMockExamId(), q.getQuestionNumber()));
                     return dto;
                 })
                 .collect(Collectors.toList());
 
-        return ExamConverter.toCreateSessionResult(examId, questionDTOs);
+        // 4. 결과 반환
+        return ExamConverter.toCreateSessionResult(examId, mockExam.getTitle(), questionDTOs);
     }
 
     @Override
-    public ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, String questionId) {
-        String fileKey = String.format("temp/%s/%s.wav", examId, questionId);
+    public ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber) {
+        String fileKey = String.format("temp/%s/q_%d.wav", examId, questionNumber);
 
         software.amazon.awssdk.services.s3.model.PutObjectRequest objectRequest =
                 software.amazon.awssdk.services.s3.model.PutObjectRequest.builder()
@@ -145,33 +139,24 @@ public class ExamServiceImpl implements ExamService {
     }
 
     @Override
-    public ExamResponseDTO.SubmitResult submitAudio(String examId, String questionId, MultipartFile audioFile) {
+    public ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, MultipartFile audioFile) {
         String redisKey = "exam:status:" + examId;
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PROCESSING.name(), 1, TimeUnit.HOURS);
 
-        // [수정됨] 파일과 문자열을 섞어 보내기 위해 <String, Object>로 타입 변경
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("user_id", examId);
         body.add("mock_exam_id", "mock_001");
-        body.add("part_number", getPartNumber(questionId));
-
-        String qNumStr = questionId.replaceAll("[^0-9]", "");
-        if (qNumStr.isEmpty()) qNumStr = "1";
-        body.add("question_number", qNumStr);
-
-        // [수정됨] MultipartFile의 원본 리소스를 추출하여 AI 서버에 그대로 전달
+        body.add("part_number", getPartNumber(questionNumber));
+        body.add("question_number", questionNumber);
         body.add("audio_file", audioFile.getResource());
 
         HttpHeaders headers = new HttpHeaders();
-        // RestTemplate이 알아서 boundary를 설정하도록 MediaType만 지정
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
 
         try {
-            ResponseEntity<String> response = restTemplate.postForEntity(AI_SERVER_URL, entity, String.class);
-            log.info("AI 에이전트 채점 요청 성공: {}", response.getBody());
+            restTemplate.postForEntity(AI_SERVER_URL, entity, String.class);
         } catch (Exception e) {
-            log.error("AI 에이전트 연동 실패: {}", e.getMessage());
             redisTemplate.opsForValue().set(redisKey, ExamStatus.FAILED.name(), 1, TimeUnit.HOURS);
             throw new ExamsException(ErrorStatus._AI_SERVER_CONNECTION_ERROR);
         }

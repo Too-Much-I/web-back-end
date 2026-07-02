@@ -7,10 +7,9 @@ import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 public interface ExamService {
     ExamResponseDTO.CreateSessionResult createExamSession();
 
-    ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, String questionId);
+    ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber);
 
-    // [수정됨] DTO 대신 MultipartFile을 받도록 변경
-    ExamResponseDTO.SubmitResult submitAudio(String examId, String questionId, MultipartFile audioFile);
+    ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, MultipartFile audioFile);
 
     ExamResponseDTO.StatusResult getExamStatus(String examId);
 

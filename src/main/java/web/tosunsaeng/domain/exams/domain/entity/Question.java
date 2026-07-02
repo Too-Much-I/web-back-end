@@ -1,32 +1,45 @@
 package web.tosunsaeng.domain.exams.domain.entity;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+
 import java.util.List;
 
 @Document(collection = "questions")
-@Getter @Setter
+@Getter
 @Builder
-@NoArgsConstructor @AllArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class Question {
+
     @Id
     private String id;
-    private String examPaperId; // "mock_exam_001"
+
+    private String examPaperId;
+
+    @Field("part_number")
     private Integer partNumber;
+
+    @Field("question_number")
     private Integer questionNumber;
+
     private String audioUrl;
+    private String imageUrl;
+    private String referenceText;
+    private String question;
+    private TableContext tableContext;
 
     private Integer prepTimeSec;
     private Integer speakTimeSec;
 
-    // 유형별 데이터 (하나만 존재하거나 조합될 수 있음)
-    private String referenceText;
-    private String imageUrl;
-    private String question;
-    private TableContext tableContext;
-
-    @Getter @Builder @NoArgsConstructor @AllArgsConstructor
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TableContext {
         private String title;
         private String location;
@@ -35,7 +48,10 @@ public class Question {
         private List<TableItem> items;
     }
 
-    @Getter @Builder @NoArgsConstructor @AllArgsConstructor
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TableItem {
         private String time;
         private String sessionTitle;

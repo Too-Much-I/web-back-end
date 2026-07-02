@@ -30,8 +30,8 @@ public class ExamRestController {
     @GetMapping("/{examId}/questions/{questionId}/upload-url")
     public BaseResponse<ExamResponseDTO.UploadUrlResult> getUploadUrl(
             @PathVariable("examId") String examId,
-            @PathVariable("questionId") String questionId) {
-        return BaseResponse.onSuccess(SuccessStatus.OK, examService.getPresignedUrl(examId, questionId));
+            @PathVariable("questionId") Integer questionNumber) {
+        return BaseResponse.onSuccess(SuccessStatus.OK, examService.getPresignedUrl(examId, questionNumber));
     }
 
     // [수정됨] JSON 대신 MultipartFile을 직접 입력받도록 변경
@@ -39,9 +39,9 @@ public class ExamRestController {
     @PostMapping(value = "/{examId}/questions/{questionId}/submit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public BaseResponse<ExamResponseDTO.SubmitResult> submitAudio(
             @PathVariable("examId") String examId,
-            @PathVariable("questionId") String questionId,
+            @PathVariable("questionId") Integer questionNumber,
             @RequestPart("audio_file") MultipartFile audioFile) { // 실제 파일 수신
-        return BaseResponse.onSuccess(SuccessStatus.OK, examService.submitAudio(examId, questionId, audioFile));
+        return BaseResponse.onSuccess(SuccessStatus.OK, examService.submitAudio(examId, questionNumber, audioFile));
     }
 
     @Operation(summary = "채점 진행 상태 조회 API", description = "비동기 채점이 완료되었는지 진행 상태를 폴링(Polling)합니다.")

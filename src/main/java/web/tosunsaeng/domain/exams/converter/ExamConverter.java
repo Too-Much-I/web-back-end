@@ -13,14 +13,14 @@ import java.util.stream.Collectors;
 
 public class ExamConverter {
 
-    public static ExamResponseDTO.CreateSessionResult toCreateSessionResult(String examId, List<ExamResponseDTO.QuestionDTO> questions) {
+    public static ExamResponseDTO.CreateSessionResult toCreateSessionResult(String examId, String title, List<ExamResponseDTO.QuestionDTO> questions) {
         return ExamResponseDTO.CreateSessionResult.builder()
                 .examId(examId)
+                .title(title)
                 .questions(questions)
                 .build();
     }
 
-    // ExamConverter.java
     public static ExamResponseDTO.QuestionDTO toQuestionDTO(Question q) {
         return ExamResponseDTO.QuestionDTO.builder()
                 .part(q.getPartNumber())
@@ -42,14 +42,12 @@ public class ExamConverter {
                 .build();
     }
 
-    // (수정) ExamStatus를 매개변수로 받도록 변경
     public static ExamResponseDTO.SubmitResult toSubmitResult(ExamStatus status) {
         return ExamResponseDTO.SubmitResult.builder()
                 .status(status)
                 .build();
     }
 
-    // (수정) ExamStatus를 매개변수로 받도록 변경
     public static ExamResponseDTO.StatusResult toStatusResult(String examId, ExamStatus status, Integer progress) {
         return ExamResponseDTO.StatusResult.builder()
                 .examId(examId)
@@ -76,7 +74,7 @@ public class ExamConverter {
                 .orElse(Collections.emptyList())
                 .stream()
                 .map(part -> ExamResponseDTO.PartResultDTO.builder()
-                        .part(part.getPart())
+                        .part(part.getPart()) // Integer 매핑
                         .questionId(part.getQuestionId())
                         .sttText(part.getSttText())
                         .deductionReason(part.getDeductionReason())
@@ -95,7 +93,7 @@ public class ExamConverter {
 
     public static ExamResult toExamResult(ExamRequestDTO.AiResultReq req) {
         ExamResult.Metrics metrics = null;
-        if(req.getMetrics() != null) {
+        if (req.getMetrics() != null) {
             metrics = ExamResult.Metrics.builder()
                     .pronunciation(req.getMetrics().getPronunciation())
                     .fluency(req.getMetrics().getFluency())
@@ -109,7 +107,7 @@ public class ExamConverter {
         if (req.getPartResults() != null) {
             partResults = req.getPartResults().stream()
                     .map(part -> ExamResult.PartResult.builder()
-                            .part(part.getPart())
+                            .part(part.getPart()) // Integer 매핑
                             .questionId(part.getQuestionId())
                             .sttText(part.getSttText())
                             .deductionReason(part.getDeductionReason())
