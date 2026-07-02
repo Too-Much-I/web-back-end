@@ -9,7 +9,6 @@ import org.springframework.web.multipart.MultipartFile;
 import web.tosunsaeng.domain.exams.converter.ExamConverter;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
-import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
@@ -41,7 +40,6 @@ public class ExamServiceImpl implements ExamService {
     // AI 서버 주소
     private final String AI_SERVER_URL = "https://slighting-silent-dormitory.ngrok-free.dev/evaluations";
 
-    private final QuestionRepository questionRepository;
     private final ExamResultRepository examResultRepository;
     private final MockExamRepository mockExamRepository;
 
