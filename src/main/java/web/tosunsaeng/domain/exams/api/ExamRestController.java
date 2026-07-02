@@ -3,7 +3,9 @@ package web.tosunsaeng.domain.exams.api;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import web.tosunsaeng.domain.exams.application.ExamService;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
@@ -32,13 +34,14 @@ public class ExamRestController {
         return BaseResponse.onSuccess(SuccessStatus.OK, examService.getPresignedUrl(examId, questionId));
     }
 
-    @Operation(summary = "업로드 완료 알림 및 채점 요청 API", description = "S3 업로드가 완료되면 호출하여 AI 채점을 시작합니다.")
-    @PostMapping("/{examId}/questions/{questionId}/submit")
+    // [수정됨] JSON 대신 MultipartFile을 직접 입력받도록 변경
+    @Operation(summary = "업로드 완료 알림 및 채점 요청 API (임시: 파일 직접 전송)", description = "S3 우회용으로 실제 음성 파일을 전송하여 AI 채점을 시작합니다.")
+    @PostMapping(value = "/{examId}/questions/{questionId}/submit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public BaseResponse<ExamResponseDTO.SubmitResult> submitAudio(
             @PathVariable("examId") String examId,
             @PathVariable("questionId") String questionId,
-            @RequestBody ExamRequestDTO.SubmitAudioReq request) {
-        return BaseResponse.onSuccess(SuccessStatus.OK, examService.submitAudio(examId, questionId, request));
+            @RequestPart("audio_file") MultipartFile audioFile) { // 실제 파일 수신
+        return BaseResponse.onSuccess(SuccessStatus.OK, examService.submitAudio(examId, questionId, audioFile));
     }
 
     @Operation(summary = "채점 진행 상태 조회 API", description = "비동기 채점이 완료되었는지 진행 상태를 폴링(Polling)합니다.")

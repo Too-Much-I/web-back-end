@@ -2,6 +2,7 @@ package web.tosunsaeng.domain.exams.converter;
 
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
+import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 
@@ -26,7 +27,6 @@ public class ExamConverter {
                 .text(question.getText())
                 .prepTimeSec(question.getPrepTimeSec())
                 .speakTimeSec(question.getSpeakTimeSec())
-                // audioUrl은 Service 레이어에서 세팅
                 .build();
     }
 
@@ -38,13 +38,15 @@ public class ExamConverter {
                 .build();
     }
 
-    public static ExamResponseDTO.SubmitResult toSubmitResult(String status) {
+    // (수정) ExamStatus를 매개변수로 받도록 변경
+    public static ExamResponseDTO.SubmitResult toSubmitResult(ExamStatus status) {
         return ExamResponseDTO.SubmitResult.builder()
                 .status(status)
                 .build();
     }
 
-    public static ExamResponseDTO.StatusResult toStatusResult(String examId, String status, Integer progress) {
+    // (수정) ExamStatus를 매개변수로 받도록 변경
+    public static ExamResponseDTO.StatusResult toStatusResult(String examId, ExamStatus status, Integer progress) {
         return ExamResponseDTO.StatusResult.builder()
                 .examId(examId)
                 .overallStatus(status)
@@ -72,7 +74,6 @@ public class ExamConverter {
                 .map(part -> ExamResponseDTO.PartResultDTO.builder()
                         .part(part.getPart())
                         .questionId(part.getQuestionId())
-                        // audioUrl은 Service 레이어에서 세팅
                         .sttText(part.getSttText())
                         .deductionReason(part.getDeductionReason())
                         .etsRubric(part.getEtsRubric())

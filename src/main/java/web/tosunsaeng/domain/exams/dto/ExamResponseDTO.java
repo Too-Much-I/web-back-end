@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 
 import java.util.List;
 
@@ -21,7 +22,7 @@ public class ExamResponseDTO {
 
     @Builder
     @Getter
-    @Setter // Service에서 audioUrl 할당을 위해 추가
+    @Setter
     @NoArgsConstructor
     @AllArgsConstructor
     public static class QuestionDTO {
@@ -30,7 +31,7 @@ public class ExamResponseDTO {
         private String text;
         private Integer prepTimeSec;
         private Integer speakTimeSec;
-        private String audioUrl; // 프론트엔드 문제 음성(TTS) 재생용 URL
+        private String audioUrl;
     }
 
     @Builder
@@ -48,7 +49,7 @@ public class ExamResponseDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class SubmitResult {
-        private String status;
+        private ExamStatus status; // (수정) String -> ExamStatus 통일
     }
 
     @Builder
@@ -57,7 +58,7 @@ public class ExamResponseDTO {
     @AllArgsConstructor
     public static class StatusResult {
         private String examId;
-        private String overallStatus; // PENDING, PROCESSING, COMPLETED
+        private ExamStatus overallStatus; // (수정) String -> ExamStatus 통일
         private Integer progressPercent;
     }
 
@@ -67,7 +68,7 @@ public class ExamResponseDTO {
     @AllArgsConstructor
     public static class ScoreResult {
         private String examId;
-        private Integer totalScore; // 명칭 통일
+        private Integer totalScore;
         private MetricsDTO metrics;
         private List<PartResultDTO> partResults;
     }
@@ -86,13 +87,13 @@ public class ExamResponseDTO {
 
     @Builder
     @Getter
-    @Setter // Service에서 audioUrl 할당을 위해 추가
+    @Setter
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PartResultDTO {
         private String part;
         private String questionId;
-        private String audioUrl; // 프론트엔드 사용자 녹음 파일 재생용 URL
+        private String audioUrl;
         private String sttText;
         private String deductionReason;
         private String etsRubric;
