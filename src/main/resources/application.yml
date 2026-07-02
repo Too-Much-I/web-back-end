@@ -1,31 +1,25 @@
 spring:
-  # MongoDB 최신 설정 (connection-string 사용)
-  mongodb:
-    connection-string: ${MONGODB_URI}
-    database: tossme-db
-
-  # Redis 설정
   data:
+    mongodb:
+      uri: ${MONGODB_URI}
+      database: tosunsaeng-db
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
 
-# JWT 설정
+  cloud:
+    aws:
+      credentials:
+        access-key: ${AWS_ACCESS_KEY}
+        secret-key: ${AWS_SECRET_KEY}
+      region:
+        static: ap-northeast-2
+      s3:
+        bucket: ${AWS_S3_BUCKET_NAME}
+
 jwt:
   secret: ${JWT_SECRET_KEY:ThisIsATemporarySecretKeyForTosunsaengProject2026!@#}
 
-# AWS S3 설정
-cloud:
-  aws:
-    credentials:
-      access-key: ${AWS_ACCESS_KEY}
-      secret-key: ${AWS_SECRET_KEY}
-    region:
-      static: ap-northeast-2
-    s3:
-      bucket: ${AWS_S3_BUCKET_NAME}
-
-# Swagger UI 설정
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -33,6 +27,5 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 
-# 서버 포트 설정 (필요 시)
 server:
   port: 8080

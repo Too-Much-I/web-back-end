@@ -1,6 +1,5 @@
 package web.tosunsaeng.domain.exams.application;
 
-import io.awspring.cloud.s3.S3Template;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,13 +28,13 @@ import java.util.stream.Collectors;
 public class ExamServiceImpl implements ExamService {
 
     private final RedisTemplate<String, Object> redisTemplate;
-    private final S3Template s3Template; // Spring Cloud AWS 제공
+    private final software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner;
 
     // MongoDB Repository 주입
     private final QuestionRepository questionRepository;
     private final ExamResultRepository examResultRepository;
 
-    @Value("${cloud.aws.s3.bucket}")
+    @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
 
     @Override
@@ -68,13 +67,29 @@ public class ExamServiceImpl implements ExamService {
 
     @Override
     public ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, String questionId) {
-        // 1. S3에 저장될 파일 경로 (Key) 생성
         String fileKey = String.format("temp/%s/%s.wav", examId, questionId);
 
-        // 2. 5분간 유효한 S3 PUT Presigned URL 발급
-        URL presignedUrl = s3Template.createSignedPutURL(bucketName, fileKey, Duration.ofMinutes(5));
+        // 1. S3에 PUT(업로드)할 객체 정보 생성
+        software.amazon.awssdk.services.s3.model.PutObjectRequest objectRequest =
+                software.amazon.awssdk.services.s3.model.PutObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(fileKey)
+                        .build();
 
-        return ExamConverter.toUploadUrlResult(presignedUrl.toString(), fileKey, 300);
+        // 2. 5분 동안 유효한 Presign 요청 생성
+        software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest presignRequest =
+                software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest.builder()
+                        .signatureDuration(Duration.ofMinutes(5))
+                        .putObjectRequest(objectRequest)
+                        .build();
+
+        // 3. 최종 URL 발급
+        software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest presignedRequest =
+                s3Presigner.presignPutObject(presignRequest);
+
+        String url = presignedRequest.url().toString();
+
+        return ExamConverter.toUploadUrlResult(url, fileKey, 300);
     }
 
     @Override

@@ -1,6 +1,6 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.1.0'
+	id 'org.springframework.boot' version '3.4.2'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -28,10 +28,11 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
 	// AWS 연동 (S3 Presigned URL용)
-	implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:3.3.0'
+	implementation 'software.amazon.awssdk:s3:2.29.52'
+	implementation 'software.amazon.awssdk:s3-presigner:2.29.52'
 
 	// Swagger (API 문서 자동화)
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4'
 
 	// JWT (SecurityConfig의 JwtTokenProvider 등을 위한 라이브러리)
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.5'

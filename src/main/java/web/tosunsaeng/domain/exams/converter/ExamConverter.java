@@ -4,7 +4,9 @@ import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class ExamConverter {
@@ -74,16 +76,31 @@ public class ExamConverter {
 
     // Entity -> DTO 변환 추가 (결과)
     public static ExamResponseDTO.ScoreResult toScoreResult(ExamResult result) {
+        if (result == null) return null;
+
+        // 1. Metrics가 null이면 0으로 구성된 DTO 생성
+        // Metrics가 null일 경우 대비
+        ExamResult.Metrics metrics = (result.getMetrics() != null) ? result.getMetrics() :
+                ExamResult.Metrics.builder()
+                        .pronunciation("0")
+                        .fluency("0")
+                        .grammar("0")
+                        .vocabulary("0")
+                        .topicRelevance("0")
+                        .build();
 
         ExamResponseDTO.MetricsDTO metricsDTO = ExamResponseDTO.MetricsDTO.builder()
-                .pronunciation(result.getMetrics().getPronunciation())
-                .fluency(result.getMetrics().getFluency())
-                .grammar(result.getMetrics().getGrammar())
-                .vocabulary(result.getMetrics().getVocabulary())
-                .topicRelevance(result.getMetrics().getTopicRelevance())
+                .pronunciation(metrics.getPronunciation())
+                .fluency(metrics.getFluency())
+                .grammar(metrics.getGrammar())
+                .vocabulary(metrics.getVocabulary())
+                .topicRelevance(metrics.getTopicRelevance())
                 .build();
 
-        List<ExamResponseDTO.PartResultDTO> partResultDTOs = result.getPartResults().stream()
+        // 2. PartResults가 null이면 빈 리스트 처리
+        List<ExamResponseDTO.PartResultDTO> partResultDTOs = Optional.ofNullable(result.getPartResults())
+                .orElse(Collections.emptyList()) // import java.util.Collections; 필요
+                .stream()
                 .map(part -> ExamResponseDTO.PartResultDTO.builder()
                         .part(part.getPart())
                         .sttText(part.getSttText())
