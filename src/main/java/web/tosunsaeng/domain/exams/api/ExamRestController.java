@@ -57,10 +57,12 @@ public class ExamRestController {
         return BaseResponse.onSuccess(SuccessStatus.OK, examService.getExamSummary(examId));
     }
 
-    @Operation(summary = "[프론트엔드] 문항별 세부 피드백 조회 API", description = "모의고사의 개별 문제들(1~11번)에 대한 피드백 리스트를 가져옵니다.")
-    @GetMapping("/{examId}/questions")
-    public BaseResponse<ExamResponseDTO.QuestionResultList> getExamQuestions(@PathVariable("examId") String examId) {
-        return BaseResponse.onSuccess(SuccessStatus.OK, examService.getExamQuestions(examId));
+    @Operation(summary = "[프론트엔드] 특정 문항 세부 피드백 조회 API", description = "요청한 특정 문제 번호에 대한 채점 결과만 가져옵니다.")
+    @GetMapping("/{examId}/questions/{questionNumber}")
+    public BaseResponse<ExamResponseDTO.QuestionResult> getExamQuestion(
+            @PathVariable("examId") String examId,
+            @PathVariable("questionNumber") Integer questionNumber) {
+        return BaseResponse.onSuccess(SuccessStatus.OK, examService.getExamQuestion(examId, questionNumber));
     }
 
     @Operation(summary = "[AI 서버용] 채점 피드백 콜백 API", description = "AI가 분석한 결과를 부분적으로 저장합니다.")

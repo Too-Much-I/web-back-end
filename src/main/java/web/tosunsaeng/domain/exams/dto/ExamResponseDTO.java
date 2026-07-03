@@ -91,9 +91,9 @@ public class ExamResponseDTO {
 
     // 💡 2-2. 개별 문항 리스트 전용 응답 DTO
     @Builder @Getter @NoArgsConstructor @AllArgsConstructor
-    public static class QuestionResultList {
+    public static class QuestionResult {
         private String examId;
-        private List<PartResultDTO> questions;
+        private PartResultDTO question;
     }
 
     @Builder @Getter @Setter @NoArgsConstructor @AllArgsConstructor
@@ -107,8 +107,6 @@ public class ExamResponseDTO {
         private String transcript;
         private ItemFeedbackDTO feedback;
 
-        // 프론트에 SpeechAce 원본을 내려줄 필드 추가
-        private Map<String, Object> speechAceData;
     }
 
     @Builder @Getter @NoArgsConstructor @AllArgsConstructor

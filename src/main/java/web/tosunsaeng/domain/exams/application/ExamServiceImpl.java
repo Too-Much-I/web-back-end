@@ -208,44 +208,36 @@ public class ExamServiceImpl implements ExamService {
     }
 
     @Override
-    public ExamResponseDTO.QuestionResultList getExamQuestions(String examId) {
+    public ExamResponseDTO.QuestionResult getExamQuestion(String examId, Integer questionNumber) {
         List<ExamResult> results = examResultRepository.findByExamId(examId);
 
-        // Map을 사용하여 문제 조각들을 문항 번호(1~11번) 기준으로 결합
-        java.util.Map<Integer, ExamResponseDTO.PartResultDTO> mergedQuestions = new java.util.HashMap<>();
+        // 1. 해당 문제 번호 + AI 피드백이 들어있는 문서만 필터링 (SpeechAce 전용 문서는 무시됨)
+        ExamResult targetDoc = results.stream()
+                .filter(r -> r.getQuestionNumber() != null
+                        && r.getQuestionNumber().equals(questionNumber)
+                        && r.getFeedback() != null)
+                .findFirst()
+                .orElse(null);
 
-        for (ExamResult doc : results) {
-            Integer qNum = doc.getQuestionNumber();
-            if (qNum == null) continue; // 요약본 도큐먼트는 생략
+        // 2. 기본 응답 뼈대 생성
+        ExamResponseDTO.PartResultDTO partDto = ExamResponseDTO.PartResultDTO.builder()
+                .partNumber(targetDoc != null && targetDoc.getPartNumber() != null ? targetDoc.getPartNumber() : getPartNumber(questionNumber))
+                .questionNumber(questionNumber)
+                .audioUrl(getDownloadUrl(examId, questionNumber))
+                .build();
 
-            mergedQuestions.putIfAbsent(qNum, ExamResponseDTO.PartResultDTO.builder()
-                    .partNumber(doc.getPartNumber() != null ? doc.getPartNumber() : getPartNumber(qNum))
-                    .questionNumber(qNum)
-                    .audioUrl(getDownloadUrl(examId, qNum)) // 💡 파일명 버그 핫픽스 적용
-                    .build());
-
-            ExamResponseDTO.PartResultDTO targetDto = mergedQuestions.get(qNum);
-
-            // 1. AI 피드백 파트 매핑
-            if (doc.getFeedback() != null) {
-                targetDto.setScore(doc.getScore());
-                targetDto.setMaxScore(doc.getMaxScore());
-                targetDto.setTranscript(doc.getTranscript());
-                targetDto.setFeedback(ExamConverter.toItemFeedbackDTO(doc.getFeedback()));
-            }
-
-            // 2. 스피치에이스 파트 매핑
-            if (doc.getSpeechAceData() != null) {
-                targetDto.setSpeechAceData(doc.getSpeechAceData());
-            }
+        // 3. AI 피드백 데이터 매핑 (SpeechAce 데이터는 프론트용 DTO에 없으므로 담지 않음)
+        if (targetDoc != null) {
+            partDto.setScore(targetDoc.getScore());
+            partDto.setMaxScore(targetDoc.getMaxScore());
+            partDto.setTranscript(targetDoc.getTranscript());
+            partDto.setFeedback(ExamConverter.toItemFeedbackDTO(targetDoc.getFeedback()));
         }
 
-        List<ExamResponseDTO.PartResultDTO> finalQuestionList = new java.util.ArrayList<>(mergedQuestions.values());
-        finalQuestionList.sort(java.util.Comparator.comparing(ExamResponseDTO.PartResultDTO::getQuestionNumber));
-
-        return ExamResponseDTO.QuestionResultList.builder()
+        // 4. 단건 결과 반환
+        return ExamResponseDTO.QuestionResult.builder()
                 .examId(examId)
-                .questions(finalQuestionList)
+                .question(partDto)
                 .build();
     }
 

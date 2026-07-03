@@ -15,7 +15,7 @@ public interface ExamService {
 
     void updateExamResult(ExamRequestDTO.AiResultReq req);
 
-    ExamResponseDTO.QuestionResultList getExamQuestions(String examId);
+    ExamResponseDTO.QuestionResult getExamQuestion(String examId, Integer questionNumber);
 
     void saveSpeechAceResult(ExamRequestDTO.SpeechAceReq req);
 
