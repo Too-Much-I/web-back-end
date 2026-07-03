@@ -9,7 +9,7 @@ public interface ExamService {
 
     ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber);
 
-    ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, MultipartFile audioFile);
+    ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber);
 
     ExamResponseDTO.StatusResult getExamStatus(String examId);
 

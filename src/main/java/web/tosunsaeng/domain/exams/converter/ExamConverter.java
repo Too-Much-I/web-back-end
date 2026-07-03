@@ -101,7 +101,7 @@ public class ExamConverter {
                 .build();
     }
 
-    // 💡 ExamServiceImpl의 12개 조각 병합 과정 중 개별 피드백 DTO를 채워주기 위한 메서드
+    // ExamServiceImpl의 12개 조각 병합 과정 중 개별 피드백 DTO를 채워주기 위한 메서드
     public static ExamResponseDTO.ItemFeedbackDTO toItemFeedbackDTO(ExamResult.ItemFeedback entity) {
         if (entity == null) return null;
 
@@ -117,6 +117,23 @@ public class ExamConverter {
                 .content(entity.getContent())
                 .grammarVocabulary(entity.getGrammarVocabulary())
                 .actionItems(entity.getActionItems())
+                .build();
+    }
+
+    public static ExamResponseDTO.SummaryResult toSummaryResult(ExamResult summaryDoc, java.util.Map<String, Double> partScores) {
+        if (summaryDoc == null) return null;
+
+        return ExamResponseDTO.SummaryResult.builder()
+                .examId(summaryDoc.getExamId())
+                .totalScore(summaryDoc.getTotalScore())
+                .levelEstimate(summaryDoc.getLevelEstimate())
+                .summary(summaryDoc.getSummary())
+                .overallFeedback(summaryDoc.getOverallFeedback())
+                .partFeedback(summaryDoc.getPartFeedback())
+                .strengths(summaryDoc.getStrengths())
+                .weaknesses(summaryDoc.getWeaknesses())
+                .recommendedPractice(summaryDoc.getRecommendedPractice())
+                .partScores(partScores) // 파트별 점수 맵핑
                 .build();
     }
 }

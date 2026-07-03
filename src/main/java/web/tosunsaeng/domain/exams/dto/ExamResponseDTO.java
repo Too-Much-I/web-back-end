@@ -87,6 +87,7 @@ public class ExamResponseDTO {
         private List<String> strengths;
         private List<String> weaknesses;
         private List<String> recommendedPractice;
+        private Map<String, Double> partScores;
     }
 
     // 💡 2-2. 개별 문항 리스트 전용 응답 DTO

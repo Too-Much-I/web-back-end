@@ -41,7 +41,7 @@ public class ExamRestController {
             @PathVariable("examId") String examId,
             @PathVariable("questionId") Integer questionNumber,
             @RequestPart("audio_file") MultipartFile audioFile) { // 실제 파일 수신
-        return BaseResponse.onSuccess(SuccessStatus.OK, examService.submitAudio(examId, questionNumber, audioFile));
+        return BaseResponse.onSuccess(SuccessStatus.OK, examService.submitAudio(examId, questionNumber));
     }
 
     @Operation(summary = "채점 진행 상태 조회 API", description = "비동기 채점이 완료되었는지 진행 상태를 폴링(Polling)합니다.")

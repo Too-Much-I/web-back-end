@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 import web.tosunsaeng.domain.exams.converter.ExamConverter;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
@@ -76,6 +75,7 @@ public class ExamServiceImpl implements ExamService {
     // --- 2. 유틸리티 로직: 문제 번호로 토스 파트 번호 계산 ---
     private Integer getPartNumber(Integer questionNumber) {
         if (questionNumber == null) return 1;
+        if (questionNumber == 0) return 0;
         if (questionNumber >= 1 && questionNumber <= 2) return 1;
         if (questionNumber >= 3 && questionNumber <= 4) return 2;
         if (questionNumber >= 5 && questionNumber <= 7) return 3;
@@ -131,24 +131,48 @@ public class ExamServiceImpl implements ExamService {
     }
 
     @Override
-    public ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, MultipartFile audioFile) {
+    public ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber) {
         String redisKey = "exam:status:" + examId;
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PROCESSING.name(), 1, TimeUnit.HOURS);
 
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add("user_id", examId);
-        body.add("mock_exam_id", "mock_001");
-        body.add("part_number", getPartNumber(questionNumber));
-        body.add("question_number", questionNumber);
-        body.add("audio_file", audioFile.getResource());
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
-
         try {
+            // 1. S3에서 업로드된 오디오 파일을 백엔드 메모리로 다운로드 (Presigned URL 활용)
+            String downloadUrl = getDownloadUrl(examId, questionNumber);
+            byte[] audioBytes = restTemplate.getForObject(downloadUrl, byte[].class);
+
+            if (audioBytes == null) {
+                throw new RuntimeException("S3에서 오디오 파일을 읽어오지 못했습니다.");
+            }
+
+            // 2. 다운받은 바이트 배열을 전송용 파일 리소스(Resource)로 래핑
+            // (주의: 멀티파트 전송 시 파일명이 없으면 거절당할 수 있으므로 getFilename()을 강제 오버라이딩 합니다)
+            org.springframework.core.io.ByteArrayResource audioResource = new org.springframework.core.io.ByteArrayResource(audioBytes) {
+                @Override
+                public String getFilename() {
+                    return "q_" + questionNumber + ".wav";
+                }
+            };
+
+            // 3. AI 서버로 보낼 폼 데이터 구성 (JSON -> MULTIPART_FORM_DATA 방식으로 복구)
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("user_id", examId);
+            body.add("mock_exam_id", "mock_001");
+            body.add("part_number", getPartNumber(questionNumber));
+            body.add("question_number", questionNumber);
+            body.add("audio_file", audioResource); // 실제 파일 바이트 첨부!
+
+            // 4. 헤더 설정
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+            HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
+
+            // 5. AI 서버로 전송
             restTemplate.postForEntity(AI_SERVER_URL, entity, String.class);
+            log.info("AI 서버에 채점 요청 전송 완료 (S3에서 다운받아 직접 전송): examId={}, qNum={}", examId, questionNumber);
+
         } catch (Exception e) {
+            log.error("AI 서버 채점 요청 실패 (S3 파일 읽기 또는 AI 서버 전송 에러)", e);
             redisTemplate.opsForValue().set(redisKey, ExamStatus.FAILED.name(), 1, TimeUnit.HOURS);
             throw new ExamsException(ErrorStatus._AI_SERVER_CONNECTION_ERROR);
         }
@@ -194,25 +218,31 @@ public class ExamServiceImpl implements ExamService {
 
     @Override
     public ExamResponseDTO.SummaryResult getExamSummary(String examId) {
+        // DB에서 해당 모의고사의 모든 결과 조각(요약 + 문제들)을 가져옴
         List<ExamResult> results = examResultRepository.findByExamId(examId);
 
-        // 요약 문서만 필터링
+        // 1. 요약 문서 필터링
         ExamResult summaryDoc = results.stream()
                 .filter(r -> r.getTotalScore() != null)
                 .findFirst()
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
 
-        return ExamResponseDTO.SummaryResult.builder()
-                .examId(summaryDoc.getExamId())
-                .totalScore(summaryDoc.getTotalScore())
-                .levelEstimate(summaryDoc.getLevelEstimate())
-                .summary(summaryDoc.getSummary())
-                .overallFeedback(summaryDoc.getOverallFeedback())
-                .partFeedback(summaryDoc.getPartFeedback())
-                .strengths(summaryDoc.getStrengths())
-                .weaknesses(summaryDoc.getWeaknesses())
-                .recommendedPractice(summaryDoc.getRecommendedPractice())
-                .build();
+        // 2. 각 파트별 평균 점수 계산 (Java Stream API 활용)
+        java.util.Map<String, Double> partScores = results.stream()
+                .filter(r -> r.getQuestionNumber() != null && r.getScore() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        r -> {
+                            int partNum = r.getPartNumber() != null ? r.getPartNumber() : getPartNumber(r.getQuestionNumber());
+                            return "part" + partNum;
+                        },
+                        java.util.stream.Collectors.averagingInt(ExamResult::getScore)
+                ));
+
+        // 3. 소수점 첫째 자리까지만 반올림
+        partScores.replaceAll((part, avg) -> Math.round(avg * 10.0) / 10.0);
+
+        // 💡 4. 컨버터를 사용하여 최종 객체 반환 (코드가 훨씬 간결해집니다)
+        return ExamConverter.toSummaryResult(summaryDoc, partScores);
     }
 
     @Override
@@ -272,6 +302,7 @@ public class ExamServiceImpl implements ExamService {
 
             // AI 서버가 일반 채점과 요약 요청을 구분할 수 있도록 0번을 명시적으로 전송
             body.put("question_number", 0);
+            body.put("part_number", 0);
 
             HttpEntity<java.util.Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
