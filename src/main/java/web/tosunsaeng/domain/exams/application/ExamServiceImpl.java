@@ -182,6 +182,14 @@ public class ExamServiceImpl implements ExamService {
         examResultRepository.save(result);
 
         log.info("AI 피드백 조각 저장 완료: examId={}, isSummary={}", req.getExamId(), req.getTotalScore() != null);
+
+        // 11번 문제 채점 결과가 저장된 직후에 전체 피드백 생성을 AI 서버에 요청!
+        // 콜백 응답이 지연되지 않도록 비동기 스레드(runAsync)로 띄워서 전송합니다.
+        if (req.getQuestionNumber() != null && req.getQuestionNumber() == 11) {
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                requestOverallSummary(req.getExamId(), req.getMockExamId());
+            });
+        }
     }
 
     @Override
@@ -251,5 +259,26 @@ public class ExamServiceImpl implements ExamService {
 
         examResultRepository.save(result);
         log.info("SpeechAce 조각 저장 완료: examId={}, questionNum={}", req.getExamId(), req.getQuestionNumber());
+    }
+
+    private void requestOverallSummary(String examId, String mockExamId) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            java.util.Map<String, Object> body = new java.util.HashMap<>();
+            body.put("user_id", examId);
+            body.put("mock_exam_id", mockExamId != null ? mockExamId : "mock_001");
+
+            // AI 서버가 일반 채점과 요약 요청을 구분할 수 있도록 0번을 명시적으로 전송
+            body.put("question_number", 0);
+
+            HttpEntity<java.util.Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
+            restTemplate.postForEntity(AI_SERVER_URL, entity, String.class);
+            log.info("AI 서버에 전체 요약 피드백 생성 요청 완료 (question_number=0): examId={}", examId);
+        } catch (Exception e) {
+            log.error("AI 서버 전체 요약 피드백 요청 실패: examId={}", examId, e);
+        }
     }
 }
