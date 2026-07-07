@@ -38,8 +38,6 @@ public class ExamResult {
     private String transcript;
     private ItemFeedback feedback;
 
-    private Map<String, Object> speechAceData;
-
     @Getter @Builder @NoArgsConstructor @AllArgsConstructor
     public static class ItemFeedback {
         private String summary;

@@ -8,9 +8,11 @@ import org.springframework.stereotype.Service;
 import web.tosunsaeng.domain.exams.converter.ExamConverter;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
+import web.tosunsaeng.domain.exams.domain.entity.SpeechAceResult;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
+import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
@@ -40,6 +42,7 @@ public class ExamServiceImpl implements ExamService {
 
     private final ExamResultRepository examResultRepository;
     private final MockExamRepository mockExamRepository;
+    private final SpeechAceResultRepository speechAceResultRepository;
 
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
@@ -281,14 +284,15 @@ public class ExamServiceImpl implements ExamService {
 
     @Override
     public void saveSpeechAceResult(ExamRequestDTO.SpeechAceReq req) {
-        ExamResult result = ExamResult.builder()
+        SpeechAceResult result = SpeechAceResult.builder()
                 .examId(req.getExamId())
                 .questionNumber(req.getQuestionNumber())
                 .speechAceData(req.getSpeechAceData())
                 .build();
 
-        examResultRepository.save(result);
-        log.info("SpeechAce 조각 저장 완료: examId={}, questionNum={}", req.getExamId(), req.getQuestionNumber());
+        speechAceResultRepository.save(result);
+
+        log.info("SpeechAce 전용 컬렉션 저장 완료: examId={}, questionNum={}", req.getExamId(), req.getQuestionNumber());
     }
 
     private void requestOverallSummary(String examId, String mockExamId) {
