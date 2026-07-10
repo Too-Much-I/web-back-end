@@ -157,7 +157,7 @@ public class ExamServiceImpl implements ExamService {
             org.springframework.core.io.ByteArrayResource audioResource = new org.springframework.core.io.ByteArrayResource(audioBytes) {
                 @Override
                 public String getFilename() {
-                    return "q_" + questionNumber + ".wav";
+                    return "q_" + questionNumber + ".webm";
                 }
             };
 
