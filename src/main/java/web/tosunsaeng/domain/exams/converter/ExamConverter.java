@@ -32,6 +32,7 @@ public class ExamConverter {
                 .imageUrl(q.getImageUrl())
                 .tableContext(q.getTableContext())
                 .audioUrl(q.getAudioUrl())
+                .guideAudioUrl(q.getGuideAudioUrl())
                 .prepTimeSec(q.getPrepTimeSec())
                 .speakTimeSec(q.getSpeakTimeSec())
                 .build();

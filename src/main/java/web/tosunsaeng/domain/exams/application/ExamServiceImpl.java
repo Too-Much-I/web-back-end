@@ -74,6 +74,11 @@ public class ExamServiceImpl implements ExamService {
         return generatePresignedGetUrl(fileKey, 60);
     }
 
+    private String getQuestionGuideAudioUrl(String examPaperId) {
+        String fileKey = String.format("questions/%s/part3_intro.wav", examPaperId);
+        return generatePresignedGetUrl(fileKey, 60);
+    }
+
     // 💡 버그 수정: getPresignedUrl의 "temp/%s/q_%d.wav" 파일 포맷과 정확히 일치시킴
     private String getDownloadUrl(String examId, Integer questionNumber) {
         String fileKey = String.format("temp/%s/q_%d.wav", examId, questionNumber);
@@ -107,6 +112,9 @@ public class ExamServiceImpl implements ExamService {
                 .map(q -> {
                     ExamResponseDTO.QuestionDTO dto = ExamConverter.toQuestionDTO(q);
                     dto.setAudioUrl(getQuestionAudioUrl(mockExam.getMockExamId(), q.getQuestionNumber()));
+                    if (q.getPartNumber() == 3) {
+                        dto.setGuideAudioUrl(getQuestionGuideAudioUrl(mockExam.getMockExamId()));
+                    }
                     return dto;
                 })
                 .collect(Collectors.toList());

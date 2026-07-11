@@ -26,6 +26,7 @@ public class Question {
     private Integer questionNumber;
 
     private String audioUrl;
+    private String guideAudioUrl;
 
     @Field("image_url")
     private String imageUrl;

@@ -28,6 +28,7 @@ public class ExamResponseDTO {
         private String text;
         private String referenceText;
         private String audioUrl;
+        private String guideAudioUrl;
         private String imageUrl;
         private Question.TableContext tableContext;
         private Integer prepTimeSec;
