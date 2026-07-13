@@ -143,7 +143,7 @@ public class ExamServiceImpl implements ExamService {
 
         String url = presignedRequest.url().toString();
 
-        return ExamConverter.toUploadUrlResult(url, fileKey, 300);
+        return ExamConverter.toUploadUrlResult(url, fileKey, 60);
     }
 
     @Override
