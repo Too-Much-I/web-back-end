@@ -34,3 +34,8 @@ springdoc:
 
 server:
   port: 8080
+  tomcat:
+    threads:
+      max: 20       # 최대 톰캣 스레드 수 제한 (프리티어 메모리 폭발 방지)
+      min-spare: 4  # 최소 대기 스레드 수
+    max-connections: 100 # 동시에 허용할 최대 커넥션 수
