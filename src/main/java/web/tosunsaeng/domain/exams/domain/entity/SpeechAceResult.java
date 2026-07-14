@@ -20,6 +20,7 @@ public class SpeechAceResult {
 
     private String examId;
     private Integer questionNumber;
+    private Integer retryCount;
 
     // SpeechAce API의 결과 데이터를 통째로 담을 맵
     private Map<String, Object> speechAceData;

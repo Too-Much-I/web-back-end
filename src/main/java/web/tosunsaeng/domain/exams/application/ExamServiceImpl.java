@@ -315,6 +315,7 @@ public class ExamServiceImpl implements ExamService {
         SpeechAceResult result = SpeechAceResult.builder()
                 .examId(req.getExamId())
                 .questionNumber(req.getQuestionNumber())
+                .retryCount(req.getRetryCount())
                 .speechAceData(req.getSpeechAceData())
                 .build();
 
