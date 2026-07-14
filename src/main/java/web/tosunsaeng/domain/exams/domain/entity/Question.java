@@ -45,6 +45,8 @@ public class Question {
     private Integer prepTimeSec;
     private Integer speakTimeSec;
 
+    private String corrected_answer;
+
     @Getter
     @Builder
     @NoArgsConstructor

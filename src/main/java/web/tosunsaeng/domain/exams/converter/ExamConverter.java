@@ -106,7 +106,7 @@ public class ExamConverter {
                 // 새로 추가된 필드들 매핑
                 .correctionItems(toCorrectionItemEntityList(dto.getCorrectionItems()))
                 .offTopicItems(dto.getOffTopicItems())
-                .correctedAnswer(dto.getCorrectedAnswer())
+                .correctedAnswer(null)
                 .recommendedAnswer(dto.getRecommendedAnswer())
                 .nextStrategy(dto.getNextStrategy())
                 .build();
@@ -230,30 +230,36 @@ public class ExamConverter {
             String downloadUrl,
             Integer calculatedPartNumber
     ) {
-        // 🌟 1. 기존에 이미 만들어져 있는 변환 메서드를 그대로 재활용하여 문제 정보 DTO 생성!
         ExamResponseDTO.QuestionDTO questionInfoDto = ExamConverter.toQuestionDTO(rawQuestion);
 
-        // 2. 내부 중첩 구조인 PartResultDTO 빌드
+        ExamResponseDTO.ItemFeedbackDTO feedbackDto = (targetDoc != null && targetDoc.getFeedback() != null)
+                ? toItemFeedbackDTO(targetDoc.getFeedback())
+                : null;
+
+        if (feedbackDto == null) {
+            feedbackDto = ExamResponseDTO.ItemFeedbackDTO.builder().build();
+        }
+
+        if (rawQuestion != null) {
+            feedbackDto.setCorrectedAnswer(rawQuestion.getCorrected_answer());
+        }
+
         ExamResponseDTO.PartResultDTO partDto = ExamResponseDTO.PartResultDTO.builder()
-                .questionInfo(questionInfoDto) // 🌟 재활용한 DTO 통째로 주입! 표 정보까지 한 방에 해결
+                .questionInfo(questionInfoDto)
                 .partNumber(targetDoc != null && targetDoc.getPartNumber() != null ? targetDoc.getPartNumber() : calculatedPartNumber)
                 .questionNumber(questionNumber)
                 .retryCount(retryCount)
                 .totalRetryCount(totalRetryCount)
                 .audioUrl(downloadUrl)
-
-                // AI 채점 피드백 데이터 조건부 주입
                 .score(targetDoc != null ? targetDoc.getScore() : null)
                 .maxScore(targetDoc != null ? targetDoc.getMaxScore() : null)
                 .transcript(targetDoc != null ? targetDoc.getTranscript() : null)
-                .feedback(targetDoc != null ? toItemFeedbackDTO(targetDoc.getFeedback()) : null)
-                .spokenWordSequence(targetDoc != null ? toSpokenWordDTOList(targetDoc.getSpokenWordSequence()) : null)
+                .feedback(feedbackDto)
 
-                // Azure AI 데이터 조건부 주입
+                .spokenWordSequence(targetDoc != null ? toSpokenWordDTOList(targetDoc.getSpokenWordSequence()) : null)
                 .azureFeedback(matchingAzure != null ? toAzureFeedbackDTO(matchingAzure) : null)
                 .build();
 
-        // 3. 최종 계층인 QuestionResult로 감싸서 반환
         return ExamResponseDTO.QuestionResult.builder()
                 .examId(examId)
                 .question(partDto)

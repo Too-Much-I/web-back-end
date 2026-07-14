@@ -92,7 +92,7 @@ public class ExamResponseDTO {
         private QuestionDTO questionInfo;
     }
 
-    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    @Builder @Getter @Setter @NoArgsConstructor @AllArgsConstructor
     public static class ItemFeedbackDTO {
         private String summary;
         private String level;
