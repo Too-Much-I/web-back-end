@@ -193,12 +193,13 @@ public class ExamConverter {
                 .build()).collect(Collectors.toList());
     }
 
-    public static ExamResponseDTO.SummaryResult toSummaryResult(ExamResult summaryDoc, Map<String, Double> partScores) {
+    public static ExamResponseDTO.SummaryResult toSummaryResult(ExamResult summaryDoc, Map<String, Double> partScores, int totalSolvedQuestions) {
         if (summaryDoc == null) return null;
         return ExamResponseDTO.SummaryResult.builder()
                 .examId(summaryDoc.getExamId())
                 .totalScore(summaryDoc.getTotalScore())
                 .levelEstimate(summaryDoc.getLevelEstimate())
+                .totalSolvedQuestions(totalSolvedQuestions)
                 .summary(summaryDoc.getSummary())
                 .overallFeedback(summaryDoc.getOverallFeedback())
                 .partFeedback(summaryDoc.getPartFeedback())

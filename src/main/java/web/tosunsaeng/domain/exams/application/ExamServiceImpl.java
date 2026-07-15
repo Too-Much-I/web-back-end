@@ -273,7 +273,13 @@ public class ExamServiceImpl implements ExamService {
         // 소수점 유실 방지 및 가독성을 위한 첫째 자리 반올림 정규화를 수행합니다.
         partScores.replaceAll((part, sum) -> Math.round(sum * 10.0) / 10.0);
 
-        return ExamConverter.toSummaryResult(summaryDoc, partScores);
+        // 유저가 실제 풀이한 순수 문항 개수 산출 (retryCount == 0 이거나 null 체크, 종합요약 문서 제외)
+        long totalSolvedQuestions = results.stream()
+                .filter(r -> r.getQuestionNumber() != null && r.getQuestionNumber() > 0)
+                .filter(r -> r.getRetryCount() != null && r.getRetryCount() == 0)
+                .count();
+
+        return ExamConverter.toSummaryResult(summaryDoc, partScores, (int) totalSolvedQuestions);
     }
 
     // 유저가 채점 결과를 문항 단위로 핀포인트 조회할 때, 문제 원본(MongoDB)과 AI 결과 조각, Azure 발음 분석 세션을 결합합니다.

@@ -60,6 +60,7 @@ public class ExamResponseDTO {
         private String examId;
         private Integer totalScore;
         private String levelEstimate;
+        private int totalSolvedQuestions;
         private String summary;
         private String overallFeedback;
         private Map<String, String> partFeedback;
