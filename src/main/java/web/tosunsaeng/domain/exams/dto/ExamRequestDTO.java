@@ -47,7 +47,7 @@ public class ExamRequestDTO {
     public static class SpeechAceReq {
         @JsonProperty("user_id") private String examId;
         @JsonProperty("question_number") private Integer questionNumber;
-        @JsonProperty("retry-count") private Integer retryCount;
+        @JsonProperty("retry_count") private Integer retryCount;
         @JsonProperty("speechace_result") private Map<String, Object> speechAceData;
     }
 
