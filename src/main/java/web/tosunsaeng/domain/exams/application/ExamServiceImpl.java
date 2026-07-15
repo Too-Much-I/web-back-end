@@ -431,10 +431,9 @@ public class ExamServiceImpl implements ExamService {
 
     // 사용자가 시험 화면에서 강제 종료 혹은 중단을 명시적으로 선택했을 때, 추가 오디오 제출을 완전 잠금 조치하고 AI 서버 종합 피드백 요약을 즉시 호출합니다.
     @Override
-    public ExamResponseDTO.SubmitResult terminateAndRequestAiFeedback(String examId, Integer questionNumber) {
+    public ExamResponseDTO.SubmitResult terminateAndRequestAiFeedback(String examId, Integer lastQuestionNumber) {
         String redisKey = "exam:status:" + examId;
 
-        // 1. 기존 가드: 시험 세션 상태 확인
         String statusStr = (String) redisTemplate.opsForValue().get(redisKey);
         if (statusStr == null) {
             throw new ExamsException(ErrorStatus._EXAM_NOT_FOUND);
@@ -445,29 +444,29 @@ public class ExamServiceImpl implements ExamService {
             throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);
         }
 
-        // 2. 일단 PROCESSING 상태로 락을 걸어 프론트엔드가 대기하도록 만듭니다.
+        // 일단 PROCESSING 상태로 락을 걸어 프론트엔드가 대기하도록 만듭니다.
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PROCESSING.name(), 1, TimeUnit.HOURS);
-        log.info("유저 명시적 요청에 의한 시험 세션 중도 종료 처리 시작 (채점 대기): examId={}, 마지막 문제 번호={}", examId, questionNumber);
+        log.info("[중단 요청 수신] 유저 명시적 요청에 의한 시험 세션 중도 종료 처리 시작: examId={}, 전달된 마지막 문제 번호={}", examId, lastQuestionNumber);
 
-        // 3. AI 비동기 요약 연산 및 마지막 문항 추적 가드 트리거
+        // AI 비동기 요약 연산 트리거 요청
         java.util.concurrent.CompletableFuture.runAsync(() -> {
             try {
-                // 해당 번호의 개별 문항 피드백이 MongoDB에 들어올 때까지 대기합니다.
-                if (questionNumber != null && questionNumber > 0) {
+                // lastQuestionNumber가 0 이하이거나 null이면 가드를 서지 않습니다.
+                if (lastQuestionNumber != null && lastQuestionNumber > 0) {
                     int poolCount = 0;
                     boolean isLastQuestionSaved = false;
 
-                    log.info("▶ [중단 가드] 마지막 제출 문항(qNum={})이 몽고DB에 적재될 때까지 대기를 시작합니다.", questionNumber);
+                    log.info("▶ [중단 가드 작동] 마지막 제출 문항(qNum={})이 몽고DB에 적재될 때까지 대기 루프를 시작합니다.", lastQuestionNumber);
 
-                    while (poolCount < 20) { // 최대 20초 대기
+                    while (poolCount < 30) { // 비동기 지연을 고려해 최대 30초 대기하도록 조금 늘려줍니다.
                         List<ExamResult> currentResults = examResultRepository.findByExamId(examId);
 
                         isLastQuestionSaved = currentResults.stream()
                                 .anyMatch(result -> result.getQuestionNumber() != null
-                                        && result.getQuestionNumber().equals(questionNumber));
+                                        && result.getQuestionNumber().equals(lastQuestionNumber));
 
                         if (isLastQuestionSaved) {
-                            log.info("✔ [중단 가드 해제] 마지막 문항(qNum={}) 채점 데이터 확인 완료.", questionNumber);
+                            log.info("✔ [중단 가드 해제] 마지막 문항(qNum={}) 채점 데이터 몽고DB 확인 완료. 대기를 종료합니다.", lastQuestionNumber);
                             break;
                         }
 
@@ -476,15 +475,15 @@ public class ExamServiceImpl implements ExamService {
                     }
 
                     if (!isLastQuestionSaved) {
-                        log.warn("⚠️ [중단 가드 타임아웃] 20초 대기 초과. 현재까지 쌓인 데이터로 종합 요약을 진행합니다.");
+                        log.warn("⚠️ [중단 가드 타임아웃] 30초 대기 초과. 마지막 문항(qNum={})이 누락되었을 수 있으나 종합 요약을 진행합니다.", lastQuestionNumber);
                     }
                 } else {
-                    log.info("▶ [중단 가드 패스] 유효한 이전 풀이 문항 번호가 없어 즉시 요약을 요청합니다.");
+                    log.warn("▶ [중단 가드 패스] 전달된 문항 번호가 유효하지 않거나 0입니다(lastQuestionNumber={}). 대기 없이 요약을 즉시 요청합니다.", lastQuestionNumber);
                 }
 
-                // 4. 마지막 문항 저장 확인 후 종합 피드백 트리거
+                // [주의] 이 메서드가 혹시 비동기 블록 바깥이나 다른 곳에서 중복으로 호출되고 있지 않은지 꼭 체크해 주세요.
                 requestOverallSummary(examId, "mock_exam_003");
-                log.info("AI 서버 종합 요약 피드백 생성 트리거 요청 완료: examId={}", examId);
+                log.info("★ [AI 서버 요청 완료] 종합 요약 피드백 생성 트리거 요청 성공: examId={}", examId);
 
             } catch (Exception e) {
                 log.error("비동기 AI 채점 요청 중 오류 발생: examId={}", examId, e);
@@ -492,7 +491,6 @@ public class ExamServiceImpl implements ExamService {
             }
         });
 
-        // 프론트엔드에게 PROCESSING 상태를 반환하여 폴링을 계속 돌게 만듭니다.
         return ExamConverter.toSubmitResult(ExamStatus.PROCESSING);
     }
 }
