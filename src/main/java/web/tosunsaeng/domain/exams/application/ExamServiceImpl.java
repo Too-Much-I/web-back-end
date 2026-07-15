@@ -446,7 +446,7 @@ public class ExamServiceImpl implements ExamService {
 
         // 일단 PROCESSING 상태로 락을 걸어 프론트엔드가 대기하도록 만듭니다.
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PROCESSING.name(), 1, TimeUnit.HOURS);
-        log.info("[중단 요청 수신] 유저 명시적 요청에 의한 시험 세션 중도 종료 처리 시작: examId={}, 전달된 마지막 문제 번호={}", examId, lastQuestionNumber);
+        log.info("[중단 요청 수신] 유저 요청에 의한 시험 세션 중도 종료 처리 시작: examId={}, 전달된 마지막 문제 번호={}", examId, lastQuestionNumber);
 
         // AI 비동기 요약 연산 트리거 요청
         java.util.concurrent.CompletableFuture.runAsync(() -> {
