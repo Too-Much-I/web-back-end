@@ -458,7 +458,7 @@ public class ExamServiceImpl implements ExamService {
 
                     log.info("▶ [중단 가드 작동] 마지막 제출 문항(qNum={})이 몽고DB에 적재될 때까지 대기 루프를 시작합니다.", lastQuestionNumber);
 
-                    while (poolCount < 30) { // 비동기 지연을 고려해 최대 30초 대기하도록 조금 늘려줍니다.
+                    while (poolCount < 60) { // 비동기 지연을 고려해 최대 30초 대기하도록 조금 늘려줍니다.
                         List<ExamResult> currentResults = examResultRepository.findByExamId(examId);
 
                         isLastQuestionSaved = currentResults.stream()
@@ -475,7 +475,7 @@ public class ExamServiceImpl implements ExamService {
                     }
 
                     if (!isLastQuestionSaved) {
-                        log.warn("⚠️ [중단 가드 타임아웃] 30초 대기 초과. 마지막 문항(qNum={})이 누락되었을 수 있으나 종합 요약을 진행합니다.", lastQuestionNumber);
+                        log.warn("⚠️ [중단 가드 타임아웃] 60초 대기 초과. 마지막 문항(qNum={})이 누락되었을 수 있으나 종합 요약을 진행합니다.", lastQuestionNumber);
                     }
                 } else {
                     log.warn("▶ [중단 가드 패스] 전달된 문항 번호가 유효하지 않거나 0입니다(lastQuestionNumber={}). 대기 없이 요약을 즉시 요청합니다.", lastQuestionNumber);
