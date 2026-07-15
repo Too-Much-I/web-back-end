@@ -111,4 +111,12 @@ public class ExamRestController {
         ExamResponseDTO.QuestionPollResult result = examService.getQuestionProcessingStatus(examId, questionNumber, retryCount);
         return BaseResponse.onSuccess(SuccessStatus.OK, result);
     }
+
+    @PostMapping("/{examId}/terminate")
+    public BaseResponse<ExamResponseDTO.SubmitResult> terminateExam(
+            @PathVariable String examId
+    ) {
+        ExamResponseDTO.SubmitResult result = examService.terminateAndRequestAiFeedback(examId);
+        return BaseResponse.onSuccess(SuccessStatus.OK, result);
+    }
 }

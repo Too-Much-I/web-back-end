@@ -28,4 +28,6 @@ public interface ExamService {
     ExamResponseDTO.CreateSessionResult createTrialSession();
 
     ExamResponseDTO.QuestionPollResult getQuestionProcessingStatus(String examId, Integer questionNumber, Integer retryCount);
+
+    ExamResponseDTO.SubmitResult terminateAndRequestAiFeedback(String examId);
 }
