@@ -294,7 +294,7 @@ public class ExamServiceImpl implements ExamService {
 
         // Azure 연산 결과 레포지토리에서 문항 식별 및 특정 회차 타겟 레코드를 로드합니다.
         AzureResult matchingAzure = azureResultRepository
-                .findByExamIdAndQuestionNumberAndRetryCount(examId, questionNumber, retryCount)
+                .findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(examId, questionNumber, retryCount)
                 .orElse(null);
 
         // 해당 문항에 대해 유저가 누적하여 도전한 총 횟수를 연산합니다.
