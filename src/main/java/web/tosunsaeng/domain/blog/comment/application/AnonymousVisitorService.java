@@ -6,6 +6,10 @@ import java.time.Instant;
 
 public interface AnonymousVisitorService {
 
+    PreparedVisitor prepare(String rawToken, Instant now);
+
+    VisitorResolution commit(PreparedVisitor preparedVisitor, Instant now);
+
     VisitorResolution resolve(String rawToken, Instant now);
 
     VisitorResolution regenerate(String rawToken, Instant now);
@@ -15,5 +19,11 @@ public interface AnonymousVisitorService {
         public boolean hasNewCookie() {
             return rawTokenToSet != null;
         }
+    }
+
+    record PreparedVisitor(
+            AnonymousVisitor visitor,
+            String rawTokenToSet,
+            boolean newVisitor) {
     }
 }

@@ -24,3 +24,7 @@ blog:
         image-key: character-image/example-otter-v1.webp
       - noun: 펭귄
         image-key: character-image/example-penguin-v1.webp
+  comment:
+    abuse:
+      secret: test-only-comment-rate-limit-secret-at-least-32-bytes
+      enabled: false

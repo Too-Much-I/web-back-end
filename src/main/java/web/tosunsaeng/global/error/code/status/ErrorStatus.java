@@ -37,7 +37,27 @@ public enum ErrorStatus implements BaseErrorCode {
     _COMMENT_VALIDATION_FAILED(
             HttpStatus.BAD_REQUEST,
             "COMMENT_4001",
-            "댓글 작성 규칙을 확인해 주세요.");
+            "댓글 작성 규칙을 확인해 주세요."),
+    _COMMENT_MODERATION_INVALID_REQUEST(
+            HttpStatus.BAD_REQUEST,
+            "COMMENT_4002",
+            "댓글 운영 요청이 올바르지 않습니다."),
+    _COMMENT_HIDDEN_REASON_REQUIRED(
+            HttpStatus.BAD_REQUEST,
+            "COMMENT_4003",
+            "댓글 숨김 사유가 필요합니다."),
+    _COMMENT_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "COMMENT_4004",
+            "댓글을 찾을 수 없습니다."),
+    _COMMENT_STATE_CONFLICT(
+            HttpStatus.CONFLICT,
+            "COMMENT_4091",
+            "현재 댓글 상태에서는 요청한 작업을 수행할 수 없습니다."),
+    _COMMENT_RATE_LIMITED(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "COMMENT_4290",
+            "댓글 작성 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus httpStatus;
     private final String code;

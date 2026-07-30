@@ -3,6 +3,8 @@ package web.tosunsaeng.domain.blog.comment.application;
 import web.tosunsaeng.domain.blog.comment.dto.BlogCommentRequestDTO;
 import web.tosunsaeng.domain.blog.comment.dto.BlogCommentResponseDTO;
 
+import java.util.function.Supplier;
+
 public interface BlogCommentService {
 
     BlogCommentResponseDTO.CommentPageResult getComments(String slug, int page, int size);
@@ -10,13 +12,25 @@ public interface BlogCommentService {
     CreatedCommentSession createComment(
             String slug,
             BlogCommentRequestDTO.CreateCommentRequest request,
-            String rawToken);
+            String rawToken,
+            Supplier<String> clientIpSupplier);
 
     AnonymousProfileSession regenerateAnonymousProfile(String rawToken);
 
     record CreatedCommentSession(
             BlogCommentResponseDTO.CreatedCommentResult result,
-            String rawTokenToSet) {
+            String rawTokenToSet,
+            boolean acceptedWithoutCreation) {
+
+        public CreatedCommentSession(
+                BlogCommentResponseDTO.CreatedCommentResult result,
+                String rawTokenToSet) {
+            this(result, rawTokenToSet, false);
+        }
+
+        public static CreatedCommentSession acceptedRequest() {
+            return new CreatedCommentSession(null, null, true);
+        }
     }
 
     record AnonymousProfileSession(

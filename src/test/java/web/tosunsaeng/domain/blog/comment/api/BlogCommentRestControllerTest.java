@@ -3,18 +3,23 @@ package web.tosunsaeng.domain.blog.comment.api;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import web.tosunsaeng.domain.blog.comment.api.support.AnonymousCookieFactory;
+import web.tosunsaeng.domain.blog.comment.api.support.ClientIpResolver;
 import web.tosunsaeng.domain.blog.comment.application.BlogCommentService;
 import web.tosunsaeng.domain.blog.comment.config.AnonymousSessionProperties;
 import web.tosunsaeng.domain.blog.comment.domain.enums.CommentRule;
+import web.tosunsaeng.domain.blog.comment.domain.enums.CommentLimitScope;
 import web.tosunsaeng.domain.blog.comment.domain.policy.CommentValidator;
 import web.tosunsaeng.domain.blog.comment.dto.BlogCommentResponseDTO;
 import web.tosunsaeng.domain.blog.comment.exception.BlogCommentException;
 import web.tosunsaeng.domain.blog.comment.exception.BlogCommentExceptionAdvice;
 import web.tosunsaeng.domain.blog.comment.exception.CommentValidationException;
+import web.tosunsaeng.domain.blog.comment.exception.CommentRateLimitException;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 import web.tosunsaeng.global.exception.GlobalExceptionAdvice;
 
@@ -44,15 +49,18 @@ class BlogCommentRestControllerTest {
             "https://cdn.example.test/character-image/example-otter-v1.webp";
 
     private BlogCommentService blogCommentService;
+    private ClientIpResolver clientIpResolver;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         blogCommentService = mock(BlogCommentService.class);
+        clientIpResolver = mock(ClientIpResolver.class);
         AnonymousCookieFactory cookieFactory = new AnonymousCookieFactory(sessionProperties());
         mockMvc = standaloneSetup(new BlogCommentRestController(
                         blogCommentService,
-                        cookieFactory))
+                        cookieFactory,
+                        clientIpResolver))
                 .setControllerAdvice(
                         new BlogCommentExceptionAdvice(),
                         new GlobalExceptionAdvice())
@@ -89,7 +97,7 @@ class BlogCommentRestControllerTest {
 
     @Test
     void createsCommentWith201BaseResponseAndApprovedCookie() throws Exception {
-        when(blogCommentService.createComment(eq("public-post"), any(), eq(null)))
+        when(blogCommentService.createComment(eq("public-post"), any(), eq(null), any()))
                 .thenReturn(new BlogCommentService.CreatedCommentSession(
                         createdComment(),
                         "new-raw-token"));
@@ -132,7 +140,8 @@ class BlogCommentRestControllerTest {
 
     @Test
     void existingCookieIsPassedToServiceWithoutBeingReissued() throws Exception {
-        when(blogCommentService.createComment(eq("public-post"), any(), eq("existing-token")))
+        when(blogCommentService.createComment(
+                eq("public-post"), any(), eq("existing-token"), any()))
                 .thenReturn(new BlogCommentService.CreatedCommentSession(
                         createdComment(),
                         null));
@@ -147,7 +156,51 @@ class BlogCommentRestControllerTest {
         verify(blogCommentService).createComment(
                 eq("public-post"),
                 any(),
-                eq("existing-token"));
+                eq("existing-token"),
+                any());
+    }
+
+    @Test
+    void honeypotReturnsGeneric202WithoutResultCookieOrCommentId() throws Exception {
+        when(blogCommentService.createComment(eq("public-post"), any(), eq(null), any()))
+                .thenReturn(BlogCommentService.CreatedCommentSession.acceptedRequest());
+
+        mockMvc.perform(post("/api/posts/public-post/comments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content": "봇 댓글",
+                                  "website": "https://bot.example"
+                                }
+                                """))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMENT_203"))
+                .andExpect(jsonPath("$.message").value("요청이 접수되었습니다."))
+                .andExpect(jsonPath("$.result").doesNotExist())
+                .andExpect(header().doesNotExist("Set-Cookie"));
+
+        verifyNoInteractions(clientIpResolver);
+    }
+
+    @ParameterizedTest
+    @EnumSource(CommentLimitScope.class)
+    void rateLimitReturns429RetryAfterAndApprovedScope(CommentLimitScope scope)
+            throws Exception {
+        when(blogCommentService.createComment(eq("public-post"), any(), eq(null), any()))
+                .thenThrow(new CommentRateLimitException(321, scope));
+
+        mockMvc.perform(post("/api/posts/public-post/comments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"정상 댓글\",\"website\":\"\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "321"))
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value("COMMENT_4290"))
+                .andExpect(jsonPath("$.result.retryAfterSeconds").value(321))
+                .andExpect(jsonPath("$.result.limitScope").value(scope.name()))
+                .andExpect(jsonPath("$.result.redisKey").doesNotExist())
+                .andExpect(jsonPath("$.result.hash").doesNotExist());
     }
 
     @Test
@@ -155,7 +208,7 @@ class BlogCommentRestControllerTest {
         List<CommentValidator.Violation> violations = List.of(
                 violation(CommentRule.COMMENT_MIN_LENGTH),
                 violation(CommentRule.COMMENT_EMPTY));
-        when(blogCommentService.createComment(eq("public-post"), any(), eq(null)))
+        when(blogCommentService.createComment(eq("public-post"), any(), eq(null), any()))
                 .thenThrow(new CommentValidationException(
                         ErrorStatus._COMMENT_VALIDATION_FAILED,
                         violations));

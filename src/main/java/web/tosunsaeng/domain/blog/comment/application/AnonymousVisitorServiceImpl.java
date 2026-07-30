@@ -31,21 +31,39 @@ public class AnonymousVisitorServiceImpl implements AnonymousVisitorService {
     }
 
     @Override
-    public VisitorResolution resolve(String rawToken, Instant now) {
+    public PreparedVisitor prepare(String rawToken, Instant now) {
         Optional<AnonymousVisitor> existingVisitor = findExistingVisitor(rawToken);
         if (existingVisitor.isPresent()) {
-            AnonymousVisitor visitor = existingVisitor.get();
-            visitor.touch(now);
-            return new VisitorResolution(anonymousVisitorRepository.save(visitor), null);
+            return new PreparedVisitor(existingVisitor.get(), null, false);
         }
-        return createVisitor(now);
+        return prepareNewVisitor(now);
+    }
+
+    @Override
+    public VisitorResolution commit(PreparedVisitor preparedVisitor, Instant now) {
+        AnonymousVisitor visitor = preparedVisitor.visitor();
+        if (!preparedVisitor.newVisitor()) {
+            visitor.touch(now);
+        }
+        return new VisitorResolution(
+                anonymousVisitorRepository.save(visitor),
+                preparedVisitor.rawTokenToSet());
+    }
+
+    @Override
+    public VisitorResolution resolve(String rawToken, Instant now) {
+        PreparedVisitor preparedVisitor = prepare(rawToken, now);
+        if (!preparedVisitor.newVisitor()) {
+            return commit(preparedVisitor, now);
+        }
+        return commitNewVisitorWithRetry(preparedVisitor, now);
     }
 
     @Override
     public VisitorResolution regenerate(String rawToken, Instant now) {
         Optional<AnonymousVisitor> existingVisitor = findExistingVisitor(rawToken);
         if (existingVisitor.isEmpty()) {
-            return createVisitor(now);
+            return resolve(rawToken, now);
         }
 
         AnonymousVisitor visitor = existingVisitor.get();
@@ -74,30 +92,39 @@ public class AnonymousVisitorServiceImpl implements AnonymousVisitorService {
         return anonymousVisitorRepository.findByTokenHash(tokenHash);
     }
 
-    private VisitorResolution createVisitor(Instant now) {
+    private VisitorResolution commitNewVisitorWithRetry(
+            PreparedVisitor firstCandidate,
+            Instant now) {
+        PreparedVisitor candidate = firstCandidate;
         for (int attempt = 0; attempt < MAX_TOKEN_COLLISION_ATTEMPTS; attempt++) {
-            AnonymousTokenManager.AnonymousToken token = tokenManager.createToken();
-            AnonymousProfileGenerator.GeneratedProfile profile;
             try {
-                profile = profileGenerator.generate();
-            } catch (IllegalStateException exception) {
-                throw new BlogCommentException(ErrorStatus._INTERNAL_SERVER_ERROR);
-            }
-            AnonymousVisitor visitor = AnonymousVisitor.builder()
-                    .tokenHash(token.tokenHash())
-                    .nickname(profile.nickname())
-                    .avatarSeed(profile.avatarSeed())
-                    .avatarImageKey(profile.avatarImageKey())
-                    .createdAt(now)
-                    .lastSeenAt(now)
-                    .build();
-            try {
-                AnonymousVisitor savedVisitor = anonymousVisitorRepository.save(visitor);
-                return new VisitorResolution(savedVisitor, token.rawToken());
+                return commit(candidate, now);
             } catch (DuplicateKeyException exception) {
                 // tokenHash unique 충돌 시 새 token과 profile로 제한 재시도한다.
+                if (attempt + 1 < MAX_TOKEN_COLLISION_ATTEMPTS) {
+                    candidate = prepareNewVisitor(now);
+                }
             }
         }
         throw new BlogCommentException(ErrorStatus._INTERNAL_SERVER_ERROR);
+    }
+
+    private PreparedVisitor prepareNewVisitor(Instant now) {
+        AnonymousTokenManager.AnonymousToken token = tokenManager.createToken();
+        AnonymousProfileGenerator.GeneratedProfile profile;
+        try {
+            profile = profileGenerator.generate();
+        } catch (IllegalStateException exception) {
+            throw new BlogCommentException(ErrorStatus._INTERNAL_SERVER_ERROR);
+        }
+        AnonymousVisitor visitor = AnonymousVisitor.builder()
+                .tokenHash(token.tokenHash())
+                .nickname(profile.nickname())
+                .avatarSeed(profile.avatarSeed())
+                .avatarImageKey(profile.avatarImageKey())
+                .createdAt(now)
+                .lastSeenAt(now)
+                .build();
+        return new PreparedVisitor(visitor, token.rawToken(), true);
     }
 }

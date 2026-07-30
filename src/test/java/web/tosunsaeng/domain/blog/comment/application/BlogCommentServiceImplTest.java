@@ -12,10 +12,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.dao.DuplicateKeyException;
 import web.tosunsaeng.domain.blog.comment.converter.BlogCommentConverter;
 import web.tosunsaeng.domain.blog.comment.domain.entity.AnonymousVisitor;
 import web.tosunsaeng.domain.blog.comment.domain.entity.BlogComment;
 import web.tosunsaeng.domain.blog.comment.domain.enums.CommentStatus;
+import web.tosunsaeng.domain.blog.comment.domain.enums.CommentLimitScope;
 import web.tosunsaeng.domain.blog.comment.domain.policy.AvatarImageUrlResolver;
 import web.tosunsaeng.domain.blog.comment.domain.policy.CommentSpamPatternPolicy;
 import web.tosunsaeng.domain.blog.comment.domain.policy.CommentValidator;
@@ -24,6 +26,7 @@ import web.tosunsaeng.domain.blog.comment.dto.BlogCommentRequestDTO;
 import web.tosunsaeng.domain.blog.comment.dto.BlogCommentResponseDTO;
 import web.tosunsaeng.domain.blog.comment.exception.BlogCommentException;
 import web.tosunsaeng.domain.blog.comment.exception.CommentValidationException;
+import web.tosunsaeng.domain.blog.comment.exception.CommentRateLimitException;
 import web.tosunsaeng.domain.blog.domain.entity.BlogPost;
 import web.tosunsaeng.domain.blog.domain.enums.BlogPostStatus;
 import web.tosunsaeng.domain.blog.domain.repository.BlogPostRepository;
@@ -34,12 +37,16 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -61,6 +68,9 @@ class BlogCommentServiceImplTest {
     @Mock
     private AnonymousVisitorService anonymousVisitorService;
 
+    @Mock
+    private CommentAbusePreventionService commentAbusePreventionService;
+
     private BlogCommentServiceImpl service;
 
     @BeforeEach
@@ -72,9 +82,13 @@ class BlogCommentServiceImplTest {
                 blogPostRepository,
                 blogCommentRepository,
                 anonymousVisitorService,
+                commentAbusePreventionService,
                 validator,
                 converter,
                 FIXED_CLOCK);
+        lenient().when(commentAbusePreventionService.admit(
+                        any(), any(), any(), any()))
+                .thenReturn(CommentAbusePreventionService.Admission.withoutReservation());
     }
 
     @Test
@@ -172,17 +186,16 @@ class BlogCommentServiceImplTest {
                 "visitor-1", "차분한 수달", "seed-1", OTTER_KEY);
         when(blogPostRepository.findPublicPostBySlug("public-post", NOW))
                 .thenReturn(Optional.of(post));
-        when(anonymousVisitorService.resolve("existing-cookie", NOW))
-                .thenReturn(new AnonymousVisitorService.VisitorResolution(visitor, "new-cookie"));
+        stubVisitorResolution("existing-cookie", visitor, "new-cookie", true);
         when(blogCommentRepository.save(any(BlogComment.class)))
                 .thenAnswer(invocation -> withId(invocation.getArgument(0), "comment-1"));
         BlogCommentRequestDTO.CreateCommentRequest request =
                 new BlogCommentRequestDTO.CreateCommentRequest(
                         JsonNodeFactory.instance.textNode("\t 정상 댓글 \n"),
-                        "honeypot-is-ignored-in-phase-03");
+                        " \t ");
 
         BlogCommentService.CreatedCommentSession session =
-                service.createComment("public-post", request, "existing-cookie");
+                createComment("public-post", request, "existing-cookie");
 
         ArgumentCaptor<BlogComment> commentCaptor = ArgumentCaptor.forClass(BlogComment.class);
         verify(blogCommentRepository).save(commentCaptor.capture());
@@ -204,18 +217,164 @@ class BlogCommentServiceImplTest {
         assertThat(session.result().getContent()).isEqualTo("정상 댓글");
         assertThat(session.result().getAvatarImageUrl())
                 .isEqualTo("https://cdn.example.test/" + OTTER_KEY);
+        verify(commentAbusePreventionService).admit(
+                eq("token-hash"),
+                eq("post-public-post"),
+                eq("정상 댓글"),
+                any());
+        verify(commentAbusePreventionService, never()).releaseDuplicate(any());
+    }
+
+    @Test
+    void honeypotIsAcceptedWithoutValidationIpRedisVisitorCommentOrCookie() {
+        AtomicBoolean ipRequested = new AtomicBoolean();
+        BlogCommentRequestDTO.CreateCommentRequest request =
+                new BlogCommentRequestDTO.CreateCommentRequest(
+                        JsonNodeFactory.instance.textNode("무시되는 내용"),
+                        "  bot-site.example  ");
+
+        BlogCommentService.CreatedCommentSession session = service.createComment(
+                "public-post",
+                request,
+                null,
+                () -> {
+                    ipRequested.set(true);
+                    return "203.0.113.10";
+                });
+
+        assertThat(session.acceptedWithoutCreation()).isTrue();
+        assertThat(session.result()).isNull();
+        assertThat(session.rawTokenToSet()).isNull();
+        assertThat(ipRequested).isFalse();
+        verifyNoInteractions(
+                blogPostRepository,
+                anonymousVisitorService,
+                blogCommentRepository,
+                commentAbusePreventionService);
+    }
+
+    @Test
+    void rateLimitFailureDoesNotCommitVisitorOrSaveComment() {
+        AnonymousVisitor visitor = visitor(
+                "visitor-1", "차분한 수달", "seed-1", OTTER_KEY);
+        AnonymousVisitorService.PreparedVisitor prepared =
+                new AnonymousVisitorService.PreparedVisitor(visitor, "new-cookie", true);
+        when(blogPostRepository.findPublicPostBySlug("public-post", NOW))
+                .thenReturn(Optional.of(publicPost("public-post", NOW.minusSeconds(60))));
+        when(anonymousVisitorService.prepare(null, NOW)).thenReturn(prepared);
+        when(commentAbusePreventionService.admit(
+                eq("token-hash"),
+                eq("post-public-post"),
+                eq("정상 댓글"),
+                any()))
+                .thenThrow(new CommentRateLimitException(
+                        590,
+                        CommentLimitScope.DUPLICATE));
+
+        assertThatThrownBy(() -> createComment("public-post", validRequest(), null))
+                .isInstanceOf(CommentRateLimitException.class);
+
+        verify(anonymousVisitorService, never()).commit(any(), any());
+        verifyNoInteractions(blogCommentRepository);
+        verify(commentAbusePreventionService, never()).releaseDuplicate(any());
+    }
+
+    @Test
+    void mongoFailureReleasesOnlyCurrentDuplicateReservation() {
+        AnonymousVisitor visitor = visitor(
+                "visitor-1", "차분한 수달", "seed-1", OTTER_KEY);
+        stubVisitorResolution(null, visitor, "raw-token", true);
+        CommentAbusePreventionService.Admission admission =
+                CommentAbusePreventionService.Admission.reserved(
+                        "duplicate-key",
+                        "owner");
+        when(blogPostRepository.findPublicPostBySlug("public-post", NOW))
+                .thenReturn(Optional.of(publicPost("public-post", NOW.minusSeconds(60))));
+        when(commentAbusePreventionService.admit(any(), any(), any(), any()))
+                .thenReturn(admission);
+        when(blogCommentRepository.save(any(BlogComment.class)))
+                .thenThrow(new IllegalStateException("mongo unavailable"));
+
+        assertThatThrownBy(() -> createComment("public-post", validRequest(), null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("mongo unavailable");
+
+        verify(commentAbusePreventionService).releaseDuplicate(admission);
+    }
+
+    @Test
+    void newVisitorTokenCollisionReleasesReservationAndRetriesAdmission() {
+        AnonymousVisitor first = visitor(
+                null, "차분한 수달", "seed-1", OTTER_KEY);
+        AnonymousVisitor second = AnonymousVisitor.builder()
+                .id("visitor-2")
+                .tokenHash("token-hash-2")
+                .nickname("명랑한 펭귄")
+                .avatarSeed("seed-2")
+                .avatarImageKey(PENGUIN_KEY)
+                .createdAt(NOW)
+                .lastSeenAt(NOW)
+                .build();
+        AnonymousVisitorService.PreparedVisitor firstPrepared =
+                new AnonymousVisitorService.PreparedVisitor(first, "raw-1", true);
+        AnonymousVisitorService.PreparedVisitor secondPrepared =
+                new AnonymousVisitorService.PreparedVisitor(second, "raw-2", true);
+        CommentAbusePreventionService.Admission firstAdmission =
+                CommentAbusePreventionService.Admission.reserved("dup-1", "owner-1");
+        CommentAbusePreventionService.Admission secondAdmission =
+                CommentAbusePreventionService.Admission.reserved("dup-2", "owner-2");
+        when(blogPostRepository.findPublicPostBySlug("public-post", NOW))
+                .thenReturn(Optional.of(publicPost("public-post", NOW.minusSeconds(60))));
+        when(anonymousVisitorService.prepare(null, NOW))
+                .thenReturn(firstPrepared, secondPrepared);
+        when(commentAbusePreventionService.admit(any(), any(), any(), any()))
+                .thenReturn(firstAdmission, secondAdmission);
+        when(anonymousVisitorService.commit(firstPrepared, NOW))
+                .thenThrow(new DuplicateKeyException("token collision"));
+        when(anonymousVisitorService.commit(secondPrepared, NOW))
+                .thenReturn(new AnonymousVisitorService.VisitorResolution(second, "raw-2"));
+        when(blogCommentRepository.save(any(BlogComment.class)))
+                .thenAnswer(invocation -> withId(invocation.getArgument(0), "comment-2"));
+
+        BlogCommentService.CreatedCommentSession result =
+                createComment("public-post", validRequest(), null);
+
+        assertThat(result.rawTokenToSet()).isEqualTo("raw-2");
+        verify(commentAbusePreventionService).releaseDuplicate(firstAdmission);
+        verify(commentAbusePreventionService, never()).releaseDuplicate(secondAdmission);
+        verify(commentAbusePreventionService, times(2))
+                .admit(any(), any(), any(), any());
+    }
+
+    @Test
+    void tokenCollisionRetriesAreBoundedWithoutPreparingUnusedCandidate() {
+        AnonymousVisitor visitor = visitor(
+                null, "차분한 수달", "seed-1", OTTER_KEY);
+        AnonymousVisitorService.PreparedVisitor prepared =
+                new AnonymousVisitorService.PreparedVisitor(visitor, "raw-token", true);
+        when(blogPostRepository.findPublicPostBySlug("public-post", NOW))
+                .thenReturn(Optional.of(publicPost("public-post", NOW.minusSeconds(60))));
+        when(anonymousVisitorService.prepare(null, NOW)).thenReturn(prepared);
+        when(anonymousVisitorService.commit(prepared, NOW))
+                .thenThrow(new DuplicateKeyException("token collision"));
+
+        assertBlogError(
+                () -> createComment("public-post", validRequest(), null),
+                ErrorStatus._INTERNAL_SERVER_ERROR);
+
+        verify(anonymousVisitorService, times(5)).prepare(null, NOW);
+        verify(anonymousVisitorService, times(5)).commit(prepared, NOW);
+        verify(commentAbusePreventionService, times(5)).releaseDuplicate(any());
     }
 
     @Test
     void validationFailureSavesNeitherVisitorNorComment() {
-        when(blogPostRepository.findPublicPostBySlug("public-post", NOW))
-                .thenReturn(Optional.of(publicPost("public-post", NOW.minusSeconds(60))));
         BlogCommentRequestDTO.CreateCommentRequest request =
                 new BlogCommentRequestDTO.CreateCommentRequest(
                         JsonNodeFactory.instance.textNode(" \t\n "),
                         "");
 
-        assertThatThrownBy(() -> service.createComment("public-post", request, null))
+        assertThatThrownBy(() -> createComment("public-post", request, null))
                 .isInstanceOfSatisfying(
                         CommentValidationException.class,
                         exception -> assertThat(exception.getViolations().stream()
@@ -223,7 +382,11 @@ class BlogCommentServiceImplTest {
                                 .toList())
                                 .containsExactly(1, 8));
 
-        verifyNoInteractions(anonymousVisitorService, blogCommentRepository);
+        verifyNoInteractions(
+                blogPostRepository,
+                anonymousVisitorService,
+                blogCommentRepository,
+                commentAbusePreventionService);
     }
 
     @ParameterizedTest
@@ -238,7 +401,7 @@ class BlogCommentServiceImplTest {
         when(blogPostRepository.findPublicPostBySlug(slug, NOW)).thenReturn(Optional.empty());
         BlogCommentRequestDTO.CreateCommentRequest request = validRequest();
 
-        assertThatThrownBy(() -> service.createComment(slug, request, null))
+        assertThatThrownBy(() -> createComment(slug, request, null))
                 .isInstanceOfSatisfying(
                         CommentValidationException.class,
                         exception -> assertThat(exception.getViolations().stream()
@@ -250,23 +413,25 @@ class BlogCommentServiceImplTest {
     }
 
     @Test
-    void contentViolationsAndNonPublicPostAreCollectedTogetherInOrder() {
-        when(blogPostRepository.findPublicPostBySlug("missing-post", NOW))
-                .thenReturn(Optional.empty());
+    void contentViolationsAreReturnedBeforePublicPostLookup() {
         BlogCommentRequestDTO.CreateCommentRequest request =
                 new BlogCommentRequestDTO.CreateCommentRequest(
                         JsonNodeFactory.instance.nullNode(),
                         "");
 
-        assertThatThrownBy(() -> service.createComment("missing-post", request, null))
+        assertThatThrownBy(() -> createComment("missing-post", request, null))
                 .isInstanceOfSatisfying(
                         CommentValidationException.class,
                         exception -> assertThat(exception.getViolations().stream()
                                 .map(CommentValidator.Violation::ruleNumber)
                                 .toList())
-                                .containsExactly(1, 4, 8, 10));
+                                .containsExactly(1, 4, 8));
 
-        verifyNoInteractions(anonymousVisitorService, blogCommentRepository);
+        verifyNoInteractions(
+                blogPostRepository,
+                anonymousVisitorService,
+                blogCommentRepository,
+                commentAbusePreventionService);
     }
 
     @Test
@@ -276,15 +441,14 @@ class BlogCommentServiceImplTest {
                 "visitor-1", "차분한 수달", "seed-1", OTTER_KEY);
         when(blogPostRepository.findPublicPostBySlug("boundary-post", NOW))
                 .thenReturn(Optional.of(boundaryPost));
-        when(anonymousVisitorService.resolve(null, NOW))
-                .thenReturn(new AnonymousVisitorService.VisitorResolution(visitor, "raw-token"));
+        stubVisitorResolution(null, visitor, "raw-token", true);
         when(blogCommentRepository.save(any(BlogComment.class)))
                 .thenAnswer(invocation -> withId(invocation.getArgument(0), "comment-1"));
 
-        service.createComment("boundary-post", validRequest(), null);
+        createComment("boundary-post", validRequest(), null);
 
         verify(blogPostRepository).findPublicPostBySlug("boundary-post", NOW);
-        verify(anonymousVisitorService).resolve(null, NOW);
+        verify(anonymousVisitorService).prepare(null, NOW);
     }
 
     @Test
@@ -293,12 +457,11 @@ class BlogCommentServiceImplTest {
                 "visitor-1", "차분한 수달", "seed-1", OTTER_KEY);
         when(blogPostRepository.findPublicPostBySlug("public-post", NOW))
                 .thenReturn(Optional.of(publicPost("public-post", NOW.minusSeconds(60))));
-        when(anonymousVisitorService.resolve(null, NOW))
-                .thenReturn(new AnonymousVisitorService.VisitorResolution(visitor, "raw-token"));
+        stubVisitorResolution(null, visitor, "raw-token", true);
         when(blogCommentRepository.save(any(BlogComment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.createComment("public-post", validRequest(), null);
+        createComment("public-post", validRequest(), null);
 
         ArgumentCaptor<BlogComment> commentCaptor = ArgumentCaptor.forClass(BlogComment.class);
         verify(blogCommentRepository).save(commentCaptor.capture());
@@ -329,7 +492,7 @@ class BlogCommentServiceImplTest {
 
     @Test
     void reservedSearchSlugIsNotQueriedAndReturnsRuleTen() {
-        assertThatThrownBy(() -> service.createComment("search", validRequest(), null))
+        assertThatThrownBy(() -> createComment("search", validRequest(), null))
                 .isInstanceOfSatisfying(
                         CommentValidationException.class,
                         exception -> assertThat(exception.getViolations().stream()
@@ -344,6 +507,30 @@ class BlogCommentServiceImplTest {
         return new BlogCommentRequestDTO.CreateCommentRequest(
                 JsonNodeFactory.instance.textNode("정상 댓글"),
                 "");
+    }
+
+    private BlogCommentService.CreatedCommentSession createComment(
+            String slug,
+            BlogCommentRequestDTO.CreateCommentRequest request,
+            String rawToken) {
+        return service.createComment(slug, request, rawToken, () -> "127.0.0.1");
+    }
+
+    private void stubVisitorResolution(
+            String rawToken,
+            AnonymousVisitor visitor,
+            String rawTokenToSet,
+            boolean newVisitor) {
+        AnonymousVisitorService.PreparedVisitor prepared =
+                new AnonymousVisitorService.PreparedVisitor(
+                        visitor,
+                        rawTokenToSet,
+                        newVisitor);
+        when(anonymousVisitorService.prepare(rawToken, NOW)).thenReturn(prepared);
+        when(anonymousVisitorService.commit(prepared, NOW))
+                .thenReturn(new AnonymousVisitorService.VisitorResolution(
+                        visitor,
+                        rawTokenToSet));
     }
 
     private BlogPost publicPost(String slug, Instant publishedAt) {

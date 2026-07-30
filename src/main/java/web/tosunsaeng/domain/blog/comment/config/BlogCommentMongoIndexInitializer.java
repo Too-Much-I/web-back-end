@@ -25,6 +25,8 @@ public class BlogCommentMongoIndexInitializer implements ApplicationRunner {
             "idx_blog_comments_post_status_created_at";
     static final String COMMENT_VISITOR_INDEX_NAME =
             "idx_blog_comments_anonymous_visitor_id";
+    static final String COMMENT_STATUS_CREATED_AT_INDEX_NAME =
+            "idx_blog_comments_status_created_at";
 
     private final MongoTemplate mongoTemplate;
 
@@ -36,12 +38,14 @@ public class BlogCommentMongoIndexInitializer implements ApplicationRunner {
         IndexOperations commentIndexes = mongoTemplate.indexOps(BlogComment.class);
         commentIndexes.ensureIndex(commentPostStatusCreatedAtIndex());
         commentIndexes.ensureIndex(commentVisitorIndex());
+        commentIndexes.ensureIndex(commentStatusCreatedAtIndex());
 
         log.info(
-                "Ensured MongoDB indexes: {}, {}, {}",
+                "Ensured MongoDB indexes: {}, {}, {}, {}",
                 VISITOR_TOKEN_HASH_INDEX_NAME,
                 COMMENT_POST_STATUS_CREATED_AT_INDEX_NAME,
-                COMMENT_VISITOR_INDEX_NAME);
+                COMMENT_VISITOR_INDEX_NAME,
+                COMMENT_STATUS_CREATED_AT_INDEX_NAME);
     }
 
     static Index visitorTokenHashIndex() {
@@ -63,5 +67,12 @@ public class BlogCommentMongoIndexInitializer implements ApplicationRunner {
         return new Index()
                 .on("anonymousVisitorId", Sort.Direction.ASC)
                 .named(COMMENT_VISITOR_INDEX_NAME);
+    }
+
+    static Index commentStatusCreatedAtIndex() {
+        return new Index()
+                .on("status", Sort.Direction.ASC)
+                .on("createdAt", Sort.Direction.DESC)
+                .named(COMMENT_STATUS_CREATED_AT_INDEX_NAME);
     }
 }

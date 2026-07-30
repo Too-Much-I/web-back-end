@@ -2,6 +2,7 @@ package web.tosunsaeng.domain.blog.comment.application;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import web.tosunsaeng.domain.blog.comment.converter.BlogCommentConverter;
 import web.tosunsaeng.domain.blog.comment.domain.entity.AnonymousVisitor;
@@ -21,15 +22,18 @@ import web.tosunsaeng.global.error.code.status.ErrorStatus;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 @Service
 public class BlogCommentServiceImpl implements BlogCommentService {
 
     static final int MAX_PAGE_SIZE = 100;
+    static final int MAX_TOKEN_COLLISION_ATTEMPTS = 5;
 
     private final BlogPostRepository blogPostRepository;
     private final BlogCommentRepository blogCommentRepository;
     private final AnonymousVisitorService anonymousVisitorService;
+    private final CommentAbusePreventionService commentAbusePreventionService;
     private final CommentValidator commentValidator;
     private final BlogCommentConverter blogCommentConverter;
     private final Clock clock;
@@ -38,12 +42,14 @@ public class BlogCommentServiceImpl implements BlogCommentService {
             BlogPostRepository blogPostRepository,
             BlogCommentRepository blogCommentRepository,
             AnonymousVisitorService anonymousVisitorService,
+            CommentAbusePreventionService commentAbusePreventionService,
             CommentValidator commentValidator,
             BlogCommentConverter blogCommentConverter,
             Clock clock) {
         this.blogPostRepository = blogPostRepository;
         this.blogCommentRepository = blogCommentRepository;
         this.anonymousVisitorService = anonymousVisitorService;
+        this.commentAbusePreventionService = commentAbusePreventionService;
         this.commentValidator = commentValidator;
         this.blogCommentConverter = blogCommentConverter;
         this.clock = clock;
@@ -68,38 +74,109 @@ public class BlogCommentServiceImpl implements BlogCommentService {
     public CreatedCommentSession createComment(
             String slug,
             BlogCommentRequestDTO.CreateCommentRequest request,
-            String rawToken) {
-        Instant now = clock.instant();
-        Optional<BlogPost> publicPost = findPublicPost(slug, now);
-        CommentValidator.ValidationResult validation = commentValidator.validate(
-                request == null ? null : request.getContent(),
-                publicPost.isPresent());
-        if (validation.hasViolations()) {
-            throw new CommentValidationException(
-                    ErrorStatus._COMMENT_VALIDATION_FAILED,
-                    validation.violations());
+            String rawToken,
+            Supplier<String> clientIpSupplier) {
+        if (isHoneypot(request)) {
+            return CreatedCommentSession.acceptedRequest();
         }
 
-        AnonymousVisitorService.VisitorResolution visitorResolution =
-                anonymousVisitorService.resolve(rawToken, now);
+        CommentValidator.ValidationResult contentValidation = commentValidator.validate(
+                request == null ? null : request.getContent(),
+                true);
+        if (contentValidation.hasViolations()) {
+            throwValidation(contentValidation);
+        }
+
+        Instant now = clock.instant();
+        Optional<BlogPost> publicPost = findPublicPost(slug, now);
+        if (publicPost.isEmpty()) {
+            throwValidation(commentValidator.validate(
+                    request == null ? null : request.getContent(),
+                    false));
+        }
+
+        AnonymousVisitorService.PreparedVisitor preparedVisitor =
+                anonymousVisitorService.prepare(rawToken, now);
+        for (int attempt = 0; attempt < MAX_TOKEN_COLLISION_ATTEMPTS; attempt++) {
+            CreatedCommentSession result = createWithPreparedVisitor(
+                    publicPost.orElseThrow(),
+                    contentValidation.normalizedContent(),
+                    preparedVisitor,
+                    clientIpSupplier,
+                    now);
+            if (result != null) {
+                return result;
+            }
+            if (attempt + 1 < MAX_TOKEN_COLLISION_ATTEMPTS) {
+                preparedVisitor = anonymousVisitorService.prepare(null, now);
+            }
+        }
+        throw new BlogCommentException(ErrorStatus._INTERNAL_SERVER_ERROR);
+    }
+
+    private CreatedCommentSession createWithPreparedVisitor(
+            BlogPost post,
+            String normalizedContent,
+            AnonymousVisitorService.PreparedVisitor preparedVisitor,
+            Supplier<String> clientIpSupplier,
+            Instant now) {
+        CommentAbusePreventionService.Admission admission =
+                commentAbusePreventionService.admit(
+                        preparedVisitor.visitor().getTokenHash(),
+                        post.getId(),
+                        normalizedContent,
+                        clientIpSupplier);
+        AnonymousVisitorService.VisitorResolution visitorResolution;
+        try {
+            visitorResolution = anonymousVisitorService.commit(preparedVisitor, now);
+        } catch (DuplicateKeyException exception) {
+            releaseReservation(admission, exception);
+            if (preparedVisitor.newVisitor()) {
+                return null;
+            }
+            throw new BlogCommentException(ErrorStatus._INTERNAL_SERVER_ERROR);
+        } catch (RuntimeException exception) {
+            releaseReservation(admission, exception);
+            throw exception;
+        }
+
         AnonymousVisitor visitor = visitorResolution.visitor();
+        BlogComment comment = newVisibleComment(
+                post.getId(),
+                visitor,
+                normalizedContent,
+                now);
+        BlogComment savedComment;
+        try {
+            savedComment = blogCommentRepository.save(comment);
+        } catch (RuntimeException exception) {
+            releaseReservation(admission, exception);
+            throw exception;
+        }
+        return new CreatedCommentSession(
+                blogCommentConverter.toCreatedCommentResult(savedComment),
+                visitorResolution.rawTokenToSet());
+    }
+
+    private BlogComment newVisibleComment(
+            String postId,
+            AnonymousVisitor visitor,
+            String normalizedContent,
+            Instant now) {
         BlogComment comment = BlogComment.builder()
-                .postId(publicPost.orElseThrow().getId())
+                .postId(postId)
                 .anonymousVisitorId(visitor.getId())
                 .nickname(visitor.getNickname())
                 .avatarSeed(visitor.getAvatarSeed())
                 .avatarImageKey(visitor.getAvatarImageKey())
-                .content(validation.normalizedContent())
+                .content(normalizedContent)
                 .status(CommentStatus.VISIBLE)
                 .createdAt(now)
                 .updatedAt(now)
                 .hiddenAt(null)
                 .hiddenReason(null)
                 .build();
-        BlogComment savedComment = blogCommentRepository.save(comment);
-        return new CreatedCommentSession(
-                blogCommentConverter.toCreatedCommentResult(savedComment),
-                visitorResolution.rawTokenToSet());
+        return comment;
     }
 
     @Override
@@ -117,6 +194,29 @@ public class BlogCommentServiceImpl implements BlogCommentService {
             return Optional.empty();
         }
         return blogPostRepository.findPublicPostBySlug(slug, now);
+    }
+
+    private boolean isHoneypot(BlogCommentRequestDTO.CreateCommentRequest request) {
+        return request != null
+                && request.getWebsite() != null
+                && !request.getWebsite().strip().isEmpty();
+    }
+
+    private void throwValidation(CommentValidator.ValidationResult validation) {
+        throw new CommentValidationException(
+                ErrorStatus._COMMENT_VALIDATION_FAILED,
+                validation.violations());
+    }
+
+    private void releaseReservation(
+            CommentAbusePreventionService.Admission admission,
+            RuntimeException originalException) {
+        try {
+            commentAbusePreventionService.releaseDuplicate(admission);
+        } catch (RuntimeException cleanupException) {
+            originalException.addSuppressed(cleanupException);
+            throw cleanupException;
+        }
     }
 
     private void validatePagination(int page, int size) {

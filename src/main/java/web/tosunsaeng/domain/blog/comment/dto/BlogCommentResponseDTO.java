@@ -76,4 +76,13 @@ public class BlogCommentResponseDTO {
     public static class ValidationFailureResult {
         private List<ViolationResult> violations;
     }
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RateLimitFailureResult {
+        private long retryAfterSeconds;
+        private String limitScope;
+    }
 }

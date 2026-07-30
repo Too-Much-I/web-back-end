@@ -1,9 +1,9 @@
 # 블로그 MVP 구현 상태
 
 - 전체 상태: `IN_PROGRESS`
-- 현재 단계: `Phase 04 — 댓글 rate limit과 숨김·복원`
+- 현재 단계: `Phase 05 — 뉴스레터 구독과 구독 해지`
 - 현재 브랜치: `feat/blog-mvp`
-- 마지막 수정 시각: `2026-07-30 13:20:10 KST (+09:00)`
+- 마지막 수정 시각: `2026-07-30 16:50:52 KST (+09:00)`
 
 ## 단계별 상태
 
@@ -13,7 +13,7 @@
 | 01 | Java 21, 테스트, Mongo 스캔, Scheduling, 로컬 환경 | `DONE` |
 | 02 | 게시글 목록·상세·제목 검색 | `DONE` |
 | 03 | 익명 댓글과 번호 기반 validation | `DONE` |
-| 04 | 댓글 rate limit과 숨김·복원 | `TODO` |
+| 04 | 댓글 rate limit과 숨김·복원 | `DONE` |
 | 05 | 뉴스레터 구독과 구독 해지 | `TODO` |
 | 06 | 뉴스레터 15분 자동 발송 | `TODO` |
 | 07 | 내부 운영 API와 보안 | `TODO` |
@@ -27,9 +27,93 @@
 - `docs/blog-mvp/plans/PHASE-02-blog-read-search.md`는 `EXECUTED`다.
 - Phase 03은 승인 범위 구현, 관련 테스트 95개, 전체 158개 테스트, bootJar와 Codex review를 완료해 `DONE`이다.
 - `docs/blog-mvp/plans/PHASE-03-anonymous-comments.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
-- 현재 단계는 Phase 04이며 `TODO`다. Phase 04 계획 수립이나 구현은 시작하지 않았다.
+- Phase 04는 승인 범위 구현, 댓글 관련 152개 테스트, 전체 215개 테스트와 bootJar 검증을 완료해 `DONE`이다.
+- `docs/blog-mvp/plans/PHASE-04-comment-abuse-moderation.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
+- Current phase는 Phase 05이며 상태는 `TODO`다.
+- 저장소에는 Redis Cluster·Sentinel·다중 primary 설정이 없고 단일 `REDIS_HOST`/`REDIS_PORT`만 있어 Phase 04는 standalone/single-primary를 전제로 한다.
+- 여러 visitor/IP/duplicate key를 한 Lua에서 처리하므로 Redis Cluster 전환 시 `CROSSSLOT`을 피하도록 key와 원자성 전략을 재설계해야 한다.
+- client IP는 `request.getRemoteAddr()`만 사용하고 임의 `X-Forwarded-For`는 신뢰하지 않는다.
+- duplicate reservation은 Mongo save 전에 owner token으로 만들고 Mongo 실패 시 owner 일치 Lua로만 해제하며 rate counter는 rollback하지 않는다.
 
 ## 변경 파일
+
+Phase 04 계획 수립에서 변경한 파일:
+
+- `docs/blog-mvp/plans/PHASE-04-comment-abuse-moderation.md`
+- `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+
+Phase 04 계획 수립에서 수정하지 않는 파일:
+
+- Java 소스와 기존 테스트 전체
+- `build.gradle`, main/test application 설정
+- 기존 RedisConfig, SecurityConfig, GlobalExceptionAdvice
+- 기존 댓글·게시글·exams 비즈니스 로직
+
+Phase 04 구현에서 생성한 파일:
+
+- `src/main/java/web/tosunsaeng/domain/blog/comment/api/support/ClientIpResolver.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/application/BlogCommentModerationService.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/application/BlogCommentModerationServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/application/CommentAbusePreventionService.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/application/CommentAbusePreventionServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/config/BlogCommentAbuseConfig.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/config/BlogCommentAbuseProperties.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/converter/BlogCommentModerationConverter.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/enums/CommentLimitScope.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/enums/HiddenReason.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/policy/CommentRateLimitHasher.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/policy/CommentRateLimitKeyFactory.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/policy/RedisFailureClassifier.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/repository/CommentRateLimitRepository.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/repository/RedisCommentRateLimitRepository.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/dto/BlogCommentModerationDTO.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/exception/CommentRateLimitException.java`
+- `src/main/resources/redis/blog-comment-admission.lua`
+- `src/main/resources/redis/blog-comment-duplicate-release.lua`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/api/support/ClientIpResolverTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/application/BlogCommentModerationServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/application/CommentAbusePreventionServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/config/BlogCommentAbusePropertiesTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/domain/entity/BlogCommentStateTransitionTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/domain/policy/CommentRateLimitHasherTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/domain/policy/CommentRateLimitKeyFactoryTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/domain/policy/RedisFailureClassifierTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/domain/repository/RedisCommentRateLimitRepositoryTest.java`
+
+Phase 04 구현에서 수정한 파일:
+
+- `.env.example`
+- `src/main/resources/application.yml`
+- `src/test/resources/application-test.yml`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/api/BlogCommentRestController.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/application/AnonymousVisitorService.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/application/AnonymousVisitorServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/application/BlogCommentService.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/application/BlogCommentServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/config/BlogCommentMongoIndexInitializer.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/entity/BlogComment.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/repository/BlogCommentQueryRepository.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/repository/BlogCommentQueryRepositoryImpl.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/dto/BlogCommentResponseDTO.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/exception/BlogCommentExceptionAdvice.java`
+- `src/main/java/web/tosunsaeng/domain/blog/domain/repository/BlogPostRepository.java`
+- `src/main/java/web/tosunsaeng/global/error/code/status/ErrorStatus.java`
+- `src/main/java/web/tosunsaeng/global/error/code/status/SuccessStatus.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/api/BlogCommentRestControllerTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/application/AnonymousVisitorServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/application/BlogCommentServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/config/BlogCommentMongoIndexInitializerTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/domain/repository/BlogCommentQueryRepositoryImplTest.java`
+- `docs/blog-mvp/plans/PHASE-04-comment-abuse-moderation.md`
+- `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+
+Phase 04 구현에서 변경하지 않은 보호 파일:
+
+- `build.gradle`
+- `src/main/java/web/tosunsaeng/global/config/RedisConfig.java`
+- `src/main/java/web/tosunsaeng/global/config/SecurityConfig.java`
+- `src/main/java/web/tosunsaeng/global/exception/GlobalExceptionAdvice.java`
+- `src/main/java/web/tosunsaeng/domain/exams/**`
 
 Phase 03 구현에서 생성한 파일:
 
@@ -488,9 +572,10 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 
 ## 다음 작업
 
-1. 사용자가 Phase 03 변경을 검토하고 직접 Git 작업 여부를 결정한다.
-2. Phase 04는 `TODO`로 유지한다. 별도 DRAFT 계획 수립과 사용자 승인 전 Redis rate limit, 허니팟, 숨김·복원을 구현하지 않는다.
-3. Phase 08 전체 검수에서 실제 MongoDB index/query와 비공개 S3/CloudFront OAC 연동 테스트 인프라를 결정한다.
+1. 승인된 Phase 04 범위의 Redis abuse guard, 허니팟, 운영 조회와 숨김·복원을 구현한다.
+2. 구현 후 Phase 04를 `VERIFYING`으로 바꾸고 관련 테스트, 전체 build와 정적 검증을 수행한다.
+3. 모든 검증 성공 시에만 Phase 04를 `DONE`, 계획을 `EXECUTED`, Current phase를 Phase 05로 변경한다.
+4. Phase 08 전체 검수에서 실제 Redis Lua·TTL·동시성·topology, MongoDB index/query와 비공개 S3/CloudFront OAC 연동 테스트 인프라를 결정한다.
 
 ## Session Log
 
@@ -724,3 +809,77 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 완료 문서 반영 후 `git diff --check`와 신규 파일 trailing whitespace 검사가 성공함
 - 상태 검색의 shell quoting 실패 1회는 read-only였고 파일 또는 Git 상태에 영향이 없으며 수정된 명령으로 재확인함
 - 사용자 검토를 기다리며 Phase 04 계획이나 구현은 시작하지 않음
+
+### 2026-07-30 13:41:22 KST — Phase 04 DRAFT 계획서 작성
+
+- 상태: Phase 04 `PLANNING`, 계획 `DRAFT`, Current phase Phase 04 유지
+- 상태값은 이번 계획 수립 요청의 명시적 지시에 따라 `PLANNING`으로 유지하며 `IN_PROGRESS`나 `DONE`으로 변경하지 않음
+- 시작 브랜치: `feat/blog-mvp`
+- 시작 작업 트리: clean
+- 사전 점검: `scripts/codex-preflight.sh` 성공
+- 선행 조건: Phase 03 `DONE`, Phase 03 계획 `EXECUTED`
+- 분석 범위: 기존 댓글 작성·visitor 저장 흐름, comment Document/query/index, RedisConfig와 exams Redis 사용 전체, SecurityConfig, 공통·댓글 예외, main/test 설정과 기존 test 기반
+- 주요 권고: visitor/IP 5개 counter와 duplicate reservation을 단일 Lua admission으로 처리, 생성 시점 TTL window, owner-checked duplicate release, 연결·timeout만 fail-open
+- IP·보안 권고: `getRemoteAddr()`만 사용, 별도 `BLOG_COMMENT_RATE_LIMIT_SECRET` HMAC, raw token/IP/content key·log·응답 금지
+- 허니팟 권고: 값이 있으면 visitor/comment/Redis 미호출, generic HTTP 202와 result·cookie 없음
+- 운영 권고: Controller 없이 조회·숨김·복원 Service, conditional Mongo findAndModify, 삭제 상태·API 없음
+- 검증 이관: 실제 Redis Lua·TTL·동시성·topology와 실제 Mongo query는 Phase 08 과제로 명시
+- 변경 파일: Phase 04 계획서와 이 상태 문서만 변경
+- 미변경 범위: Java, 테스트, Redis 구현, application 설정, Gradle, SecurityConfig, 기존 댓글·게시글·exams
+- 다음 단계: 사용자가 DRAFT 계획과 결정 항목을 명시적으로 승인하기 전 구현 금지
+
+### 2026-07-30 13:45:10 KST — Phase 04 계획 수립 검증
+
+- 필수 문서: `AGENTS.md`, `REQUIREMENTS.md`, `WORKFLOW.md`, `IMPLEMENTATION_STATUS.md`, `PLANS.md`, Phase 03 계획서를 계획서 생성 전에 읽음
+- 시작 명령: `git branch --show-current`, `git status --short`, `scripts/codex-preflight.sh` 실행 및 성공
+- 코드 분석 명령: `rg --files`, `rg -n`, `sed -n`으로 blog comment 전체 구조, BlogPost 공개 query, RedisConfig와 exams Redis 전체 참조, SecurityConfig, BaseResponse·status·exception, application main/test 설정, build와 관련 tests를 확인
+- 문서 작성: `apply_patch`로 Phase 04 계획서를 생성하고 이 상태 문서의 Phase 04 `PLANNING`, 현재 목표, 변경 파일, 다음 작업과 append-only Session Log를 반영
+- 생성 직후 재독: 필수 문서와 새 Phase 04 계획서를 규정 순서로 EOF까지 다시 읽음
+- 계획 검증: 필수 heading, Redis/HMAC/허니팟/중복/상태 전이 항목, 최소 test 1~68, DRAFT·PLANNING 상태를 `rg`로 확인
+- 범위 검증: `git status --short --untracked-files=all` 결과는 Phase 04 계획서와 상태 문서 두 개뿐이며 Java, test, Gradle, env/application 설정 변경 없음
+- 정적 검증: 변경 문서 trailing whitespace 없음, `git diff --check` 성공
+- 계획 전용 작업이므로 Gradle test와 build, Redis·Mongo 연결은 실행하지 않음
+- 결과: 계획 `DRAFT`, Phase 04 `PLANNING`, Current phase 04를 유지하고 사용자 승인을 기다림
+
+### 2026-07-30 13:55:19 KST — Phase 04 계획 승인 및 구현 시작
+
+- 상태: Phase 04 `IN_PROGRESS`, 계획 `APPROVED`, Current phase Phase 04 유지
+- 승인 근거: 사용자가 Phase 04 계획을 명시적으로 승인하고 Redis topology, Lua blocker 처리, HMAC/IP, 허니팟, duplicate reservation, 상태 전이와 테스트 범위를 확정함
+- 시작 브랜치: `feat/blog-mvp`
+- 시작 작업 트리: 직전 Codex가 만든 Phase 04 계획서와 상태 문서 변경만 존재함
+- preflight: 브랜치는 통과했고 known Phase 04 문서 두 개가 미커밋 상태라 clean-tree 검사만 실패함
+- topology 확인: Redis Cluster·Sentinel·다중 primary 설정 없음, main 설정은 단일 host/port, local compose는 단일 Redis container
+- standalone 제한: 여러 key Lua는 Cluster에서 `CROSSSLOT` 가능성이 있어 Cluster 지원을 구현하지 않고 전환 시 재설계 대상으로 기록함
+- 확정 정책: blocker 최대 TTL, 승인된 tie 우선순위, website trim 후 허니팟, pre-save owner reservation, Mongo 실패 owner-checked cleanup, counter 비rollback
+- IP 정책: `request.getRemoteAddr()`만 사용하고 forwarding header와 SecurityConfig는 변경하지 않음
+- 제외 범위: 운영 Controller·내부 인증, 댓글 수정·삭제, CAPTCHA, newsletter, 실제 Redis/Mongo 접근, Cluster, Testcontainers, 관련 없는 리팩터링
+- 구현 원칙: 승인 계획의 예상 파일 밖 변경이나 계약 차이가 필요하면 소스 수정을 중단하고 보고함
+
+### 2026-07-30 16:47:49 KST — Phase 04 구현 완료 및 검증 시작
+
+- 상태: Phase 04 `VERIFYING`, 계획 `APPROVED`, Current phase Phase 04 유지
+- Redis: standalone/single-primary 전제의 단일 Lua admission으로 visitor 3개 창, IP 2개 창과 duplicate owner reservation을 함께 판정함
+- 댓글 작성: 허니팟 조기 202, content validation 선행, 공개 글 확인, visitor prepare, Redis admission, visitor commit, comment save와 owner-checked cleanup 순서로 구현함
+- 장애 정책: Redis connection/timeout만 sanitized warning 후 fail-open하고 Lua 계약·key·decode·application 오류는 generic 500으로 처리함
+- 운영 기능: Controller 없이 status/post/slug/[from,to) 조회와 조건부 findAndModify 숨김·복원 Service를 구현하고 삭제 상태·API는 추가하지 않음
+- 인덱스: 기존 postId/status/createdAt을 재사용하고 status/createdAt 운영 조회 index만 추가함
+- 설정: 별도 32-byte HMAC secret, enabled, duplicate TTL만 환경변수로 노출하고 test profile은 안전한 dummy secret과 disabled를 사용함
+- 예비 검증: 댓글 관련 test와 전체 `./gradlew test`가 성공했으며 전체 필수 clean build와 정적 범위 검증을 이어서 수행함
+- 알려진 제한: fixed-window 경계 burst, Redis-Mongo 분산 transaction 부재, fail-open 중 남용 가능성, Cluster `CROSSSLOT` 비호환과 실제 Redis/Mongo 통합 미검증은 Phase 08 대상으로 유지함
+
+### 2026-07-30 16:50:52 KST — Phase 04 검증 완료
+
+- 상태: Phase 04 `DONE`, 계획 `EXECUTED`, Current phase Phase 05 `TODO`
+- 필수 검사: `git diff --check` 성공
+- 관련 테스트: `./gradlew test --tests 'web.tosunsaeng.domain.blog.comment.*'` 성공, 댓글 관련 152개 failures/errors/skipped 0
+- 필수 전체 빌드: `./gradlew clean test bootJar` `BUILD SUCCESSFUL`, 전체 215개 failures/errors/skipped 0, bootJar 생성 성공
+- Redis review: standalone 단일 Lua admission, 5개 fixed-window counter, duplicate owner reservation, 최대 TTL·동률 scope 선택, counter TTL 비연장과 no-partial-mutation 계약 확인
+- 장애 review: connection/timeout만 fail-open, 구현 오류 generic 500, Mongo 실패 시 owner-checked duplicate cleanup과 rate counter 비rollback 확인
+- IP·개인정보 review: `getRemoteAddr()`만 사용하고 raw IP/token/content·digest·key·secret을 응답과 로그에 노출하지 않으며 X-Forwarded-For를 직접 신뢰하지 않음
+- 허니팟 review: trim 후 값이 있으면 202/result·commentId·cookie 없음, visitor/comment/Redis 미호출 확인
+- moderation review: 외부 Controller 없이 조회·숨김·복원 Service만 추가하고 조건부 상태 전이, half-open 기간, 민감정보 제외와 추가 index 확인
+- 제외 범위 review: 댓글 수정·삭제, `/internal/comments`, API Key, SecurityConfig, CAPTCHA, newsletter, AWS/S3, Cluster, Testcontainers와 실제 Redis/Mongo 접근 없음
+- 실패 이력: 구현 중 record static factory 이름 충돌 컴파일 두 건과 index test 기대 호출 수 한 건을 수정한 뒤 모든 필수 검증을 재실행해 성공함
+- 승인 계획 차이: 외부 기능 차이는 없고 lazy IP Supplier와 최소 환경변수 노출은 승인 처리 순서·설정 범위 안의 구현 세부사항임
+- Phase 08 이관: 실제 Redis Lua syntax·TTL·동시성, standalone topology 장애, Cluster 전환 재설계, 실제 Mongo index/query와 신뢰 proxy client IP 검증
+- 다음 단계: 사용자 검토와 커밋 전 Phase 05 계획 또는 구현을 시작하지 않음

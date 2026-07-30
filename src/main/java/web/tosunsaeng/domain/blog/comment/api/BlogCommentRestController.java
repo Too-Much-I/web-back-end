@@ -2,6 +2,7 @@ package web.tosunsaeng.domain.blog.comment.api;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import web.tosunsaeng.domain.blog.comment.api.support.AnonymousCookieFactory;
+import web.tosunsaeng.domain.blog.comment.api.support.ClientIpResolver;
 import web.tosunsaeng.domain.blog.comment.application.BlogCommentService;
 import web.tosunsaeng.domain.blog.comment.dto.BlogCommentRequestDTO;
 import web.tosunsaeng.domain.blog.comment.dto.BlogCommentResponseDTO;
@@ -25,12 +27,15 @@ public class BlogCommentRestController {
 
     private final BlogCommentService blogCommentService;
     private final AnonymousCookieFactory anonymousCookieFactory;
+    private final ClientIpResolver clientIpResolver;
 
     public BlogCommentRestController(
             BlogCommentService blogCommentService,
-            AnonymousCookieFactory anonymousCookieFactory) {
+            AnonymousCookieFactory anonymousCookieFactory,
+            ClientIpResolver clientIpResolver) {
         this.blogCommentService = blogCommentService;
         this.anonymousCookieFactory = anonymousCookieFactory;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @Operation(summary = "공개 게시글 댓글 목록 조회")
@@ -53,9 +58,21 @@ public class BlogCommentRestController {
                     @CookieValue(
                             value = AnonymousCookieFactory.COOKIE_NAME,
                             required = false)
-                    String rawToken) {
+                    String rawToken,
+                    HttpServletRequest servletRequest) {
         BlogCommentService.CreatedCommentSession session =
-                blogCommentService.createComment(slug, request, rawToken);
+                blogCommentService.createComment(
+                        slug,
+                        request,
+                        rawToken,
+                        () -> clientIpResolver.resolve(servletRequest));
+        if (session.acceptedWithoutCreation()) {
+            return ResponseEntity
+                    .status(HttpStatus.ACCEPTED)
+                    .body(BaseResponse.onSuccess(
+                            SuccessStatus.BLOG_COMMENT_REQUEST_ACCEPTED,
+                            null));
+        }
         return responseWithOptionalCookie(
                 BaseResponse.onSuccess(SuccessStatus.BLOG_COMMENT_CREATED, session.result()),
                 session.rawTokenToSet(),

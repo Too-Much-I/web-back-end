@@ -9,13 +9,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import web.tosunsaeng.domain.blog.comment.domain.entity.BlogComment;
 import web.tosunsaeng.domain.blog.comment.domain.enums.CommentStatus;
+import web.tosunsaeng.domain.blog.comment.domain.enums.HiddenReason;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -95,6 +99,113 @@ class BlogCommentQueryRepositoryImplTest {
         assertThat(countQuery.getSortObject()).isEmpty();
         assertThat(countQuery.getSkip()).isZero();
         assertThat(countQuery.getLimit()).isZero();
+    }
+
+    @Test
+    void moderationQueryAppliesStatusPostAndHalfOpenCreatedAtPeriod() {
+        when(mongoTemplate.find(any(Query.class), eq(BlogComment.class)))
+                .thenReturn(List.of());
+        when(mongoTemplate.count(any(Query.class), eq(BlogComment.class))).thenReturn(0L);
+        BlogCommentQueryRepositoryImpl repository =
+                new BlogCommentQueryRepositoryImpl(mongoTemplate);
+        Instant from = Instant.parse("2026-07-01T00:00:00Z");
+        Instant to = Instant.parse("2026-08-01T00:00:00Z");
+
+        repository.findCommentsForModeration(
+                CommentStatus.HIDDEN,
+                "post-id",
+                from,
+                to,
+                PageRequest.of(1, 20));
+
+        ArgumentCaptor<Query> findCaptor = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Query> countCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(findCaptor.capture(), eq(BlogComment.class));
+        verify(mongoTemplate).count(countCaptor.capture(), eq(BlogComment.class));
+        Query query = findCaptor.getValue();
+        assertThat(query.getQueryObject())
+                .containsEntry("status", CommentStatus.HIDDEN)
+                .containsEntry("postId", "post-id");
+        assertThat(query.getQueryObject().get("createdAt"))
+                .isEqualTo(new Document("$gte", from).append("$lt", to));
+        assertThat(query.getSkip()).isEqualTo(20);
+        assertThat(query.getLimit()).isEqualTo(20);
+        assertThat(query.getSortObject())
+                .containsEntry("createdAt", -1)
+                .containsEntry("_id", -1);
+        assertThat(countCaptor.getValue().getQueryObject())
+                .isEqualTo(query.getQueryObject());
+        assertThat(countCaptor.getValue().getSortObject()).isEmpty();
+    }
+
+    @Test
+    void hideUsesAtomicAllowedSourceStatesAndSetsModerationFields() {
+        BlogComment hidden = comment("comment-1");
+        when(mongoTemplate.findAndModify(
+                any(Query.class),
+                any(Update.class),
+                any(FindAndModifyOptions.class),
+                eq(BlogComment.class)))
+                .thenReturn(hidden);
+        BlogCommentQueryRepositoryImpl repository =
+                new BlogCommentQueryRepositoryImpl(mongoTemplate);
+        Instant now = Instant.parse("2026-07-30T03:00:00Z");
+
+        Optional<BlogComment> result = repository.hideComment(
+                "comment-1", HiddenReason.SPAM, now);
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.forClass(Update.class);
+        verify(mongoTemplate).findAndModify(
+                queryCaptor.capture(),
+                updateCaptor.capture(),
+                any(FindAndModifyOptions.class),
+                eq(BlogComment.class));
+        assertThat(result).contains(hidden);
+        assertThat(queryCaptor.getValue().getQueryObject().get("_id"))
+                .isEqualTo("comment-1");
+        assertThat(queryCaptor.getValue().getQueryObject().get("status"))
+                .isEqualTo(new Document("$in", List.of(
+                        CommentStatus.VISIBLE,
+                        CommentStatus.PENDING)));
+        Document set = updateCaptor.getValue().getUpdateObject().get("$set", Document.class);
+        assertThat(set)
+                .containsEntry("status", CommentStatus.HIDDEN)
+                .containsEntry("hiddenAt", now)
+                .containsEntry("hiddenReason", HiddenReason.SPAM)
+                .containsEntry("updatedAt", now);
+    }
+
+    @Test
+    void restoreUsesAtomicHiddenSourceAndClearsHiddenMetadata() {
+        when(mongoTemplate.findAndModify(
+                any(Query.class),
+                any(Update.class),
+                any(FindAndModifyOptions.class),
+                eq(BlogComment.class)))
+                .thenReturn(comment("comment-1"));
+        BlogCommentQueryRepositoryImpl repository =
+                new BlogCommentQueryRepositoryImpl(mongoTemplate);
+        Instant now = Instant.parse("2026-07-30T03:00:00Z");
+
+        repository.restoreComment("comment-1", now);
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.forClass(Update.class);
+        verify(mongoTemplate).findAndModify(
+                queryCaptor.capture(),
+                updateCaptor.capture(),
+                any(FindAndModifyOptions.class),
+                eq(BlogComment.class));
+        assertThat(queryCaptor.getValue().getQueryObject())
+                .containsEntry("_id", "comment-1")
+                .containsEntry("status", CommentStatus.HIDDEN);
+        Document update = updateCaptor.getValue().getUpdateObject();
+        assertThat(update.get("$set", Document.class))
+                .containsEntry("status", CommentStatus.VISIBLE)
+                .containsEntry("updatedAt", now);
+        assertThat(update.get("$unset", Document.class).keySet())
+                .containsExactlyInAnyOrder("hiddenAt", "hiddenReason");
     }
 
     private Query captureFindQuery(PageRequest pageable) {

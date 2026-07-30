@@ -79,6 +79,46 @@ class AnonymousVisitorServiceImplTest {
     }
 
     @Test
+    void prepareNewVisitorDoesNotPersistBeforeAdmission() {
+        stubNewVisitor(RAW_TOKEN, TOKEN_HASH, generatedProfile("차분한", "수달", "seed"));
+
+        AnonymousVisitorService.PreparedVisitor prepared = service.prepare(null, NOW);
+
+        assertThat(prepared.newVisitor()).isTrue();
+        assertThat(prepared.rawTokenToSet()).isEqualTo(RAW_TOKEN);
+        assertThat(prepared.visitor().getTokenHash()).isEqualTo(TOKEN_HASH);
+        verify(anonymousVisitorRepository, never()).save(any());
+    }
+
+    @Test
+    void prepareExistingVisitorDoesNotTouchUntilCommit() {
+        Instant previousSeenAt = NOW.minusSeconds(60);
+        AnonymousVisitor existing = visitor(
+                "visitor-1",
+                TOKEN_HASH,
+                "차분한 수달",
+                "seed",
+                "character-image/example-otter-v1.webp",
+                previousSeenAt);
+        when(tokenManager.isValidRawToken(RAW_TOKEN)).thenReturn(true);
+        when(tokenManager.hash(RAW_TOKEN)).thenReturn(TOKEN_HASH);
+        when(anonymousVisitorRepository.findByTokenHash(TOKEN_HASH))
+                .thenReturn(Optional.of(existing));
+        when(anonymousVisitorRepository.save(existing)).thenReturn(existing);
+
+        AnonymousVisitorService.PreparedVisitor prepared = service.prepare(RAW_TOKEN, NOW);
+
+        assertThat(prepared.newVisitor()).isFalse();
+        assertThat(existing.getLastSeenAt()).isEqualTo(previousSeenAt);
+        verify(anonymousVisitorRepository, never()).save(any());
+
+        service.commit(prepared, NOW);
+
+        assertThat(existing.getLastSeenAt()).isEqualTo(NOW);
+        verify(anonymousVisitorRepository).save(existing);
+    }
+
+    @Test
     void sameValidCookieResolvesSameVisitorAndTouchesLastSeen() {
         AnonymousVisitor existing = visitor(
                 "visitor-1",

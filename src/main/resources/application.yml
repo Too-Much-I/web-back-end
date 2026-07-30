@@ -29,6 +29,11 @@ blog:
     cookie-max-age-days: ${BLOG_ANONYMOUS_COOKIE_MAX_AGE_DAYS:180}
   anonymous-profile:
     avatar-base-url: ${BLOG_ANONYMOUS_AVATAR_BASE_URL:}
+  comment:
+    abuse:
+      secret: ${BLOG_COMMENT_RATE_LIMIT_SECRET:}
+      enabled: ${BLOG_COMMENT_RATE_LIMIT_ENABLED:true}
+      duplicate-ttl-seconds: ${BLOG_COMMENT_DUPLICATE_TTL_SECONDS:600}
 
 jwt:
   secret: ${JWT_SECRET_KEY:ThisIsATemporarySecretKeyForTosunsaengProject2026!@#}

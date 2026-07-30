@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import web.tosunsaeng.domain.blog.comment.domain.enums.CommentStatus;
+import web.tosunsaeng.domain.blog.comment.domain.enums.HiddenReason;
 
 import java.time.Instant;
 
@@ -27,7 +28,7 @@ public class BlogComment {
     private Instant createdAt;
     private Instant updatedAt;
     private Instant hiddenAt;
-    private String hiddenReason;
+    private HiddenReason hiddenReason;
 
     @Builder
     public BlogComment(
@@ -42,7 +43,7 @@ public class BlogComment {
             Instant createdAt,
             Instant updatedAt,
             Instant hiddenAt,
-            String hiddenReason) {
+            HiddenReason hiddenReason) {
         this.id = id;
         this.postId = postId;
         this.anonymousVisitorId = anonymousVisitorId;

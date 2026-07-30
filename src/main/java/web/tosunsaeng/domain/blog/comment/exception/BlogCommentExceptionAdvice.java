@@ -3,6 +3,7 @@ package web.tosunsaeng.domain.blog.comment.exception;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -26,6 +27,22 @@ public class BlogCommentExceptionAdvice {
                 exception.getViolations());
         return ResponseEntity
                 .status(exception.getCode().getReasonHttpStatus().getHttpStatus())
+                .body(BaseResponse.onFailure(exception.getCode(), result));
+    }
+
+    @ExceptionHandler(CommentRateLimitException.class)
+    public ResponseEntity<BaseResponse<BlogCommentResponseDTO.RateLimitFailureResult>>
+            handleCommentRateLimit(CommentRateLimitException exception) {
+        BlogCommentResponseDTO.RateLimitFailureResult result =
+                BlogCommentResponseDTO.RateLimitFailureResult.builder()
+                        .retryAfterSeconds(exception.getRetryAfterSeconds())
+                        .limitScope(exception.getLimitScope().name())
+                        .build();
+        return ResponseEntity
+                .status(exception.getCode().getReasonHttpStatus().getHttpStatus())
+                .header(
+                        HttpHeaders.RETRY_AFTER,
+                        Long.toString(exception.getRetryAfterSeconds()))
                 .body(BaseResponse.onFailure(exception.getCode(), result));
     }
 
