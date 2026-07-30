@@ -67,12 +67,15 @@ public class ExamConverter {
     public static ExamResult toExamResult(ExamRequestDTO.AiResultReq req) {
         if (req == null) return null;
 
+        int retryCount = req.getRetryCount() != null ? req.getRetryCount() : 0;
+
         return ExamResult.builder()
+                .id(toExamResultId(req.getExamId(), req.getQuestionNumber(), retryCount))
                 .examId(req.getExamId())
                 .mockExamId(req.getMockExamId())
                 .partNumber(req.getPartNumber())
                 .questionNumber(req.getQuestionNumber())
-                .retryCount(req.getRetryCount() != null ? req.getRetryCount() : 0) // 🌟 재시도 회차 누적 저장의 핵심!
+                .retryCount(retryCount)
                 .score(req.getScore())
                 .maxScore(req.getMaxScore())
                 .transcript(req.getTranscript())
@@ -88,6 +91,12 @@ public class ExamConverter {
                 .feedback(req.getFeedback() != null ? toItemFeedbackEntity(req.getFeedback()) : null)
                 .spokenWordSequence(req.getSpokenWordSequence() != null ? toSpokenWordEntityList(req.getSpokenWordSequence()) : null)
                 .build();
+    }
+
+    private static String toExamResultId(String examId, Integer questionNumber, int retryCount) {
+        String normalizedExamId = String.valueOf(examId);
+        return "exam-result:" + normalizedExamId.length() + ":" + normalizedExamId
+                + ":q:" + String.valueOf(questionNumber) + ":r:" + retryCount;
     }
 
     private static ExamResult.ItemFeedback toItemFeedbackEntity(ExamRequestDTO.ItemFeedbackDTO dto) {
