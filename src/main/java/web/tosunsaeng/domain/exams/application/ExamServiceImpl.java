@@ -25,6 +25,8 @@ import org.springframework.util.MultiValueMap;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -264,9 +266,11 @@ public class ExamServiceImpl implements ExamService {
                 .findFirst()
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
 
-        // 파트별 세부 획득 점수의 누적 총합 연산
-        java.util.Map<String, Double> partScores = results.stream()
-                .filter(r -> r.getQuestionNumber() != null && r.getScore() != null)
+        // 재시도와 중복 콜백을 제외한 문항별 최초 채점 결과를 공통 기준으로 사용합니다.
+        List<ExamResult> initialAttemptResults = getInitialAttemptResults(results);
+
+        java.util.Map<String, Double> partScores = initialAttemptResults.stream()
+                .filter(r -> r.getScore() != null)
                 .collect(java.util.stream.Collectors.groupingBy(
                         r -> {
                             int partNum = r.getPartNumber() != null ? r.getPartNumber() : getPartNumber(r.getQuestionNumber());
@@ -278,13 +282,39 @@ public class ExamServiceImpl implements ExamService {
         // 소수점 유실 방지 및 가독성을 위한 첫째 자리 반올림 정규화를 수행합니다.
         partScores.replaceAll((part, sum) -> Math.round(sum * 10.0) / 10.0);
 
-        // 유저가 실제 풀이한 순수 문항 개수 산출 (retryCount == 0 이거나 null 체크, 종합요약 문서 제외)
-        long totalSolvedQuestions = results.stream()
-                .filter(r -> r.getQuestionNumber() != null && r.getQuestionNumber() > 0)
-                .filter(r -> r.getRetryCount() != null && r.getRetryCount() == 0)
-                .count();
+        long totalSolvedQuestions = initialAttemptResults.size();
 
         return ExamConverter.toSummaryResult(summaryDoc, partScores, (int) totalSolvedQuestions);
+    }
+
+    private List<ExamResult> getInitialAttemptResults(List<ExamResult> results) {
+        Map<Integer, ExamResult> resultsByQuestion = new LinkedHashMap<>();
+
+        for (ExamResult result : results) {
+            if (!isInitialAttempt(result)) continue;
+
+            resultsByQuestion.merge(
+                    result.getQuestionNumber(),
+                    result,
+                    this::preferScoredResult
+            );
+        }
+
+        return new ArrayList<>(resultsByQuestion.values());
+    }
+
+    private boolean isInitialAttempt(ExamResult result) {
+        Integer retryCount = result.getRetryCount();
+        return result.getQuestionNumber() != null
+                && result.getQuestionNumber() > 0
+                && (retryCount == null || retryCount == 0);
+    }
+
+    private ExamResult preferScoredResult(ExamResult existing, ExamResult candidate) {
+        if (existing.getScore() == null && candidate.getScore() != null) {
+            return candidate;
+        }
+        return existing;
     }
 
     // 유저가 채점 결과를 문항 단위로 핀포인트 조회할 때, 문제 원본(MongoDB)과 AI 결과 조각, Azure 발음 분석 세션을 결합합니다.
