@@ -1,9 +1,9 @@
 # 블로그 MVP 구현 상태
 
 - 전체 상태: `IN_PROGRESS`
-- 현재 단계: `Phase 03 — 익명 댓글과 번호 기반 validation`
+- 현재 단계: `Phase 04 — 댓글 rate limit과 숨김·복원`
 - 현재 브랜치: `feat/blog-mvp`
-- 마지막 수정 시각: `2026-07-29 17:38:50 KST (+09:00)`
+- 마지막 수정 시각: `2026-07-30 13:20:10 KST (+09:00)`
 
 ## 단계별 상태
 
@@ -12,7 +12,7 @@
 | 00 | Agent guardrails 및 저장소 분석 | `DONE` |
 | 01 | Java 21, 테스트, Mongo 스캔, Scheduling, 로컬 환경 | `DONE` |
 | 02 | 게시글 목록·상세·제목 검색 | `DONE` |
-| 03 | 익명 댓글과 번호 기반 validation | `TODO` |
+| 03 | 익명 댓글과 번호 기반 validation | `DONE` |
 | 04 | 댓글 rate limit과 숨김·복원 | `TODO` |
 | 05 | 뉴스레터 구독과 구독 해지 | `TODO` |
 | 06 | 뉴스레터 15분 자동 발송 | `TODO` |
@@ -25,9 +25,82 @@
 - `docs/blog-mvp/plans/PHASE-01-infrastructure.md`는 `EXECUTED`다.
 - Phase 02는 승인 범위 구현, 필수 테스트, 전체 build와 Codex review를 완료해 `DONE`이다.
 - `docs/blog-mvp/plans/PHASE-02-blog-read-search.md`는 `EXECUTED`다.
-- 현재 단계는 Phase 03이며 `TODO`다. Phase 03 계획이나 구현은 시작하지 않았다.
+- Phase 03은 승인 범위 구현, 관련 테스트 95개, 전체 158개 테스트, bootJar와 Codex review를 완료해 `DONE`이다.
+- `docs/blog-mvp/plans/PHASE-03-anonymous-comments.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
+- 현재 단계는 Phase 04이며 `TODO`다. Phase 04 계획 수립이나 구현은 시작하지 않았다.
 
 ## 변경 파일
+
+Phase 03 구현에서 생성한 파일:
+
+- `src/main/java/web/tosunsaeng/domain/blog/comment/api/BlogCommentRestController.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/api/support/AnonymousCookieFactory.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/application/AnonymousVisitorService.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/application/AnonymousVisitorServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/application/BlogCommentService.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/application/BlogCommentServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/config/AnonymousProfileConfig.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/config/AnonymousProfileProperties.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/config/AnonymousSessionConfig.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/config/AnonymousSessionProperties.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/config/BlogCommentMongoIndexInitializer.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/converter/BlogCommentConverter.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/entity/AnonymousVisitor.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/entity/BlogComment.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/enums/CommentRule.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/enums/CommentStatus.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/policy/AnonymousAvatarImageCatalog.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/policy/AnonymousProfileGenerator.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/policy/AnonymousTokenManager.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/policy/AvatarImageUrlResolver.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/policy/CommentSpamPatternPolicy.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/policy/CommentValidator.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/repository/AnonymousVisitorRepository.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/repository/BlogCommentQueryRepository.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/repository/BlogCommentQueryRepositoryImpl.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/domain/repository/BlogCommentRepository.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/dto/BlogCommentRequestDTO.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/dto/BlogCommentResponseDTO.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/exception/BlogCommentException.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/exception/BlogCommentExceptionAdvice.java`
+- `src/main/java/web/tosunsaeng/domain/blog/comment/exception/CommentValidationException.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/api/BlogCommentRestControllerTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/application/AnonymousVisitorServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/application/BlogCommentServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/config/BlogCommentMongoIndexInitializerTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/domain/policy/AnonymousAvatarImageCatalogTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/domain/policy/AnonymousProfileGeneratorTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/domain/policy/AnonymousTokenManagerTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/domain/policy/AvatarImageUrlResolverTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/domain/policy/CommentValidatorTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/domain/repository/BlogCommentQueryRepositoryImplTest.java`
+
+Phase 03 구현에서 수정한 파일:
+
+- `.env.example`
+- `src/main/java/web/tosunsaeng/global/error/code/status/ErrorStatus.java`
+- `src/main/java/web/tosunsaeng/global/error/code/status/SuccessStatus.java`
+- `src/main/resources/application.yml`
+- `src/test/resources/application-test.yml`
+- `docs/blog-mvp/plans/PHASE-03-anonymous-comments.md`
+- `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+
+Phase 03 구현에서 변경하지 않은 보호 파일:
+
+- `build.gradle`, `SecurityConfig`, 기존 게시글·exams 비즈니스 코드와 기존 테스트
+- 기존 `S3Config`, `RedisConfig`, `ClockConfig`, `BaseResponse`, `GlobalExceptionAdvice`
+
+Phase 03 계획 수립에서 변경한 파일:
+
+- `docs/blog-mvp/plans/PHASE-03-anonymous-comments.md`
+- `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+
+Phase 03 계획 수립에서 수정하지 않는 파일:
+
+- Java 소스와 기존 테스트 전체
+- `build.gradle`, main/test application 설정
+- `src/main/java/web/tosunsaeng/global/config/SecurityConfig.java`
+- 기존 게시글·exams 비즈니스 로직
 
 Phase 02 계획 수립에서 변경한 파일:
 
@@ -229,6 +302,54 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 전체 결과 확인: Gradle XML에서 Phase 02 61개와 기존 2개, 총 63개 failures/errors/skipped 0 확인
 - Codex review: status, 보호 파일 diff, API mapping, Newsletter/Redis/Scheduling/`Instant.now` 부재, 비밀값 패턴, trailing whitespace를 병렬 정적 검사
 
+### 2026-07-30 11:11:50 KST — Phase 03 계획 수립 명령
+
+- 계획서 생성 전 필수 문서 재확인: `cat`으로 `AGENTS.md`, `PLANS.md`, `REQUIREMENTS.md`, `WORKFLOW.md`, `IMPLEMENTATION_STATUS.md`, Phase 02 계획서를 읽음
+- 시작 조건: `git branch --show-current`, `git status --short`, `scripts/codex-preflight.sh`
+- 대상 목록: `rg --files`로 blog, exams, 공통 응답, 전역 예외, config, status code, 전체 test 파일 확인
+- blog 분석: `awk`와 `cat`으로 Controller, Service, Converter, BlogPost, policy, Repository/custom query, DTO, 예외, index initializer 전체를 읽음
+- blog test 분석: `awk`와 `cat`으로 Controller, Service, Repository BSON, index, slug policy 테스트 전체를 읽음
+- exams 분석: `awk`, `cat`, `sed`, `wc -l`로 Controller, Service interface/impl, Converter, DTO, Document, enum, Repository, 예외 전체를 읽음
+- 공통 계층 분석: `awk`로 BaseResponse, BaseCode, BaseErrorCode, SuccessStatus, ErrorStatus, GeneralException, GlobalExceptionAdvice 전체를 읽음
+- config 분석: `awk`로 Clock, CORS, Redis, RestTemplate, S3, Scheduling, Security, Swagger, JWT 관련 config 전체를 읽음
+- 테스트·기반 분석: application context/exams scan test, test profile, `build.gradle`, `TosunsaengApplication.java`를 읽음
+- 선례 검색: `rg`로 cookie/header, JSON parsing, validation, pagination, MongoTemplate/index, configuration property, COMMENT code와 API 부재를 검색함
+- 설정 파일 확인: `rg --files`, `rg`, `wc -l`로 application/env 파일 존재와 익명 cookie/HMAC 설정 부재를 확인함
+- 계획서 존재 확인: `rg --files docs/blog-mvp/plans`
+- 시각 확인: `date '+%Y-%m-%d %H:%M:%S %Z (%z)'`
+- 문서 작성: `apply_patch`로 Phase 03 DRAFT 계획서 생성과 Phase 03 `PLANNING` 상태 반영
+- 계획서 생성 직후 재독: `cat`으로 `AGENTS.md`, `REQUIREMENTS.md`, `WORKFLOW.md`, `IMPLEMENTATION_STATUS.md`, `PLANS.md`, Phase 03 계획서를 규정 순서로 읽음
+- 전체 계획서 재확인: `sed -n` 세 구간으로 Phase 03 계획서 EOF까지 읽음
+- 문서 검증: `rg`로 필수 heading, 고정 rule, 테스트 1~63, trailing whitespace를 확인함
+- 변경 범위 검증: `git status --short --untracked-files=all`, 상태 문서 `git diff`, `git diff --check`
+- 최종 기록: `date`와 `apply_patch`로 Phase 03 계획 검증 결과와 append-only Session Log를 추가함
+
+### 2026-07-30 13:17:39 KST — Phase 03 구현 및 검증 명령
+
+- 필수 문서 재확인: `sed -n`으로 `AGENTS.md`, `REQUIREMENTS.md`, `WORKFLOW.md`, `IMPLEMENTATION_STATUS.md`, `PLANS.md`, Phase 03 계획서를 규정 순서와 EOF까지 읽음
+- 재개 상태 확인: `git branch --show-current`, `git status --short --untracked-files=all`, `scripts/codex-preflight.sh`; 진행 중 변경 때문에 preflight의 clean-tree 검사만 실패했고 모두 직전 Codex Phase 03 변경임을 대조함
+- 구현 재확인: `rg --files`, `awk`, `sed`, `git diff`로 comment main/test, status enum, env/application binding을 읽음
+- 기존 테스트 선례 확인: `awk`로 Phase 02 Controller, Service, Repository query, index 테스트를 읽음
+- 구현 및 테스트 작성: `apply_patch`로 승인된 comment main/test 파일, status enum, env/application binding과 관리 문서를 작성·보완함
+- 첫 sandbox 댓글 테스트: `./gradlew test --tests 'web.tosunsaeng.domain.blog.comment.*'`가 사용자 Gradle cache lock 권한으로 task 실행 전 실패함
+- 승인된 외부 댓글 테스트: 기존 4개 profile/token 테스트가 성공함
+- 테스트 보강 후 첫 실행: 댓글 테스트 93개 중 `example.com을` domain 경계 1개 실패
+- 실패 분석: Gradle XML을 `rg`로 확인하고 domain ASCII 경계를 수정함
+- 보강 재실행: 댓글 테스트 93개 성공
+- cookie overflow와 SecureRandom Bean 테스트 추가 후 재실행: 댓글 테스트 95개 성공
+- 검증 상태 반영: `date`, `apply_patch`로 Phase 03 `VERIFYING`과 append-only Session Log를 반영함
+- 필수 검사: `git diff --check` 성공
+- 지정 관련 테스트: `./gradlew test --tests 'web.tosunsaeng.domain.blog.comment.*'` 성공
+- 첫 전체 검증: `./gradlew clean test bootJar` 성공
+- 정적 review: `rg`로 API mapping, AWS SDK/S3Presigner, Redis/Scheduling, token log, avatarImageKey 응답, PUT/PATCH/DELETE/internal/newsletter, TODO/FIXME, actual secret pattern을 검색함
+- 보호 파일 review: `git diff --name-only`과 `git status`로 Gradle, SecurityConfig, 기존 S3/Redis/Clock, BaseResponse, GlobalExceptionAdvice, BlogPost/exams 미변경을 확인함
+- 정규식 review 보완: 일반 `condition=value` 허용과 한국어 뒤 `http://` 차단 경계를 `apply_patch`로 보완하고 댓글 테스트를 재실행해 성공함
+- 최종 전체 검증: `./gradlew clean test bootJar` 성공
+- 결과 집계: Gradle XML을 `awk`로 집계해 댓글 95개, 전체 158개, failures/errors/skipped 0 확인
+- 최종 정적 검사: `git diff --check`, 신규 파일 trailing whitespace, 승인된 세 mapping, 금지 의존성·endpoint·비밀값·로그·보호 파일을 재확인함
+- 완료 상태 `rg` 확인 1회는 double-quoted shell pattern의 backtick을 명령 치환으로 해석해 `DONE`, `EXECUTED` command-not-found를 출력했으며 파일 영향은 없었다. single-quoted pattern으로 즉시 재실행해 상태를 확인함
+- 금지 Git 명령, branch 변경, 운영/외부 접근, AWS API 호출은 실행하지 않음
+
 ## 테스트 결과
 
 ### 초기 검증 결과
@@ -311,6 +432,43 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 실제 MongoDB 통합 테스트: 승인 범위에서 제외, Phase 08 전체 검수 과제로 유지
 - Codex review: 고정 요구사항, 승인 계획, 제외 범위와 실제 변경 사이에 미승인 차이 없음
 
+### Phase 03 계획 수립 검증 결과
+
+- `scripts/codex-preflight.sh`: 성공
+- Phase 02 `DONE`, 계획 `EXECUTED`, 현재 단계 Phase 03을 확인함
+- 계획서 생성 직후 필수 관리 문서와 새 Phase 03 계획서를 규정 순서로 다시 읽음
+- `PLANS.md` 필수 heading과 사용자 지정 계획 항목이 모두 존재함
+- 고정 CommentRule 1~10과 요청된 최소 테스트 1~63이 계획서에 존재함
+- 변경 문서 trailing whitespace 검색: 없음
+- `git diff --check`: 성공
+- 변경 파일은 Phase 03 계획서와 상태 문서 두 개뿐임
+- Phase 상태는 Phase 03만 `TODO`에서 `PLANNING`으로 변경하고 다른 Phase는 유지함
+- Java, 기존 테스트, Gradle, main/test application 설정, API, Mongo Document는 변경하지 않음
+- 계획 전용 작업이므로 Gradle test와 build는 실행하지 않음
+
+### Phase 03 구현 검증 결과
+
+- `./gradlew test --tests 'web.tosunsaeng.domain.blog.comment.*'`: `BUILD SUCCESSFUL`
+- Phase 03 댓글 테스트: 95개, failures 0, errors 0, skipped 0
+- `./gradlew clean test bootJar`: `BUILD SUCCESSFUL`
+- 전체 테스트: 158개, failures 0, errors 0, skipped 0
+- 기존 게시글 Phase 02 테스트 61개, `TosunsaengApplicationTests`, `ExamsRepositoryScanTest`: 모두 성공
+- `git diff --check`: 성공
+- 신규 main/test/docs/config trailing whitespace: 없음
+- 공개 mapping: 승인된 GET 1개와 POST 2개만 존재
+- 댓글 PATCH/DELETE, 게시글 쓰기, newsletter, internal 운영 mapping 부정 테스트 및 정적 검색: 추가 없음
+- validation: Unicode 2..500 code point, rule 3 비노출, rule 1~10 전체 수집·중복 제거·정렬, HTML/Markdown/URL·email·반복 경계 테스트 성공
+- 저장 차단: validation violation이 있으면 AnonymousVisitor와 BlogComment Repository save 미호출 테스트 성공
+- 익명 profile: HMAC-SHA256, raw token 비저장, SecureRandom, noun-image 1:1, 16-byte seed, 재생성, 기존 comment snapshot 불변 테스트 성공
+- cookie: HttpOnly, SameSite=Lax, Path=/, Max-Age, 환경별 Secure, JSON raw token 미노출 테스트 성공
+- Mongo query/index: VISIBLE, createdAt/_id DESC, pagination/count, tokenHash unique 및 두 comment index의 mock 정의·반복 실행 테스트 성공
+- 응답 review: avatarImageUrl만 노출하고 avatarImageKey, anonymousVisitorId, tokenHash, status/hidden 내부 필드가 없음
+- 금지 의존성 review: comment source에 AWS SDK/S3 API, Redis, Scheduling, IP 추출 없음
+- 비밀값 review: 실제 HMAC secret, 실제 CloudFront 주소, 실제 S3 object filename 없음; test dummy만 존재
+- 보호 범위: `build.gradle`, `SecurityConfig`, 기존 BlogPost/exams, BaseResponse/GlobalExceptionAdvice와 기존 S3/Redis/Clock 설정 변경 없음
+- 실제 MongoDB query/index와 비공개 S3/CloudFront OAC 통합은 실행하지 않았고 Phase 08 과제로 유지
+- Codex review: 승인 계획, 고정 요구사항, 제외 범위와 실제 변경 사이에 미승인 차이 없음
+
 ## 열린 문제
 
 - Java 17 기반 `Dokerfile`은 참조되지 않는 것으로 확인됐지만 이번 Phase에서는 삭제하지 않는다.
@@ -321,12 +479,18 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 실제 Mongo index/query 동작은 Query BSON과 mock index 정의까지만 검증했으며 실제 MongoDB 통합 검증은 Phase 08 전체 검수 과제로 남긴다.
 - case-insensitive unanchored title regex는 데이터 증가 시 검색 성능 위험이 있다.
 - 비-test 시작 시 index 생성 실패를 명시적으로 전파하므로 Mongo 장애나 기존 중복 slug가 있으면 애플리케이션 시작이 실패한다.
+- SameSite=Lax cookie는 프론트와 API가 서로 다른 site이면 전달되지 않을 수 있어 실제 배포 domain 구조 확인이 필요하다.
+- 실제 CloudFront domain과 운영 avatar option 목록은 외부 배포 설정에서 제공해야 하며 실제 비공개 S3/CloudFront OAC 연동 검증은 Phase 08 과제다.
+- HMAC secret을 회전하면 기존 anon_session과 방문자 연결이 끊기지만 기존 댓글 snapshot은 유지된다. secret rotation 절차는 운영 설계가 필요하다.
+- 방문자 저장 뒤 댓글 저장이 실패하면 방문자만 남을 수 있다. 실제 Mongo multi-document transaction 도입 여부는 Phase 08 통합 환경에서 검토한다.
+- 이미 댓글에 사용한 avatarImageKey object는 삭제하거나 덮어쓰지 않고 변경 시 versioned 새 key를 사용해야 한다.
+- 기존 SecurityConfig의 CSRF 비활성화는 Phase 03 제외 범위라 변경하지 않았다. SameSite=Lax와 실제 frontend/API site 구성을 배포 전에 확인해야 한다.
 
 ## 다음 작업
 
-1. 사용자가 Phase 02 코드와 검증 결과를 검토한다.
-2. Phase 03은 `TODO`이며 별도 계획 수립 요청과 승인 전에는 구현하지 않는다.
-3. Phase 08 전체 검수에서 실제 MongoDB index/query 통합 테스트를 수행할 테스트 인프라를 결정한다.
+1. 사용자가 Phase 03 변경을 검토하고 직접 Git 작업 여부를 결정한다.
+2. Phase 04는 `TODO`로 유지한다. 별도 DRAFT 계획 수립과 사용자 승인 전 Redis rate limit, 허니팟, 숨김·복원을 구현하지 않는다.
+3. Phase 08 전체 검수에서 실제 MongoDB index/query와 비공개 S3/CloudFront OAC 연동 테스트 인프라를 결정한다.
 
 ## Session Log
 
@@ -482,3 +646,81 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 승인 계획 차이: 승인 메시지에서 확정한 slug 정책 파일과 Criteria 재사용 수정 외 미승인 차이 없음
 - 남은 위험: 실제 Mongo index/query 통합 검증은 Phase 08 과제, regex 성능, 직접 DB 등록 시 slug 규칙, index 생성 실패 시 시작 차단
 - 다음 단계: 사용자 검토 전 Phase 03 계획이나 구현 시작 금지
+
+### 2026-07-30 11:21:10 KST — Phase 03 DRAFT 계획서 작성 완료
+
+- 상태: Phase 03 `PLANNING`, 계획 `DRAFT`, Current phase Phase 03 유지
+- 시작 브랜치: `feat/blog-mvp`
+- 시작 작업 트리: 사용자가 Phase 02 변경을 검토·커밋한 뒤 깨끗함
+- 사전 점검: `scripts/codex-preflight.sh` 성공
+- 선행 조건: Phase 02 `DONE`, Phase 02 계획 `EXECUTED`
+- 분석 범위: 기존 blog/exams 전체, 공통 응답·status·예외, global config, 전체 test, build와 application 진입점
+- 주요 권고: 기존 공개 BlogPost query와 UTC Clock 재사용, MongoTemplate 댓글 query, programmatic index, HMAC-SHA256 token hash, 180일 HttpOnly SameSite=Lax cookie, 최대 size 100
+- validation 권고: JsonNode 타입 판정, rule 3 비노출, rule 1~10 전체 수집·정렬, HTML entity·이메일 차단, 동일 문자 8회·짧은 구문 4회 반복 차단
+- Phase 04 이관: website 허니팟 실행, Redis rate limit, IP/최근 댓글 기반 제한, 숨김·복원
+- 변경 파일: `docs/blog-mvp/plans/PHASE-03-anonymous-comments.md`, `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+- 미변경 범위: Java, 테스트, Gradle, application 설정, 기존 게시글·exams, SecurityConfig, RedisConfig
+- 검증: 생성 후 필수 문서 재독, 필수 heading, rule/test 목록, trailing whitespace, `git diff --check`, 변경 범위 확인 성공
+- 다음 단계: 사용자가 계획의 승인 필요 사항을 명시적으로 승인하기 전 구현 금지
+
+### 2026-07-30 11:39:28 KST — Phase 03 랜덤 프로필 이미지 계획 보완
+
+- 상태: Phase 03 `PLANNING`, 계획 `DRAFT`, Current phase Phase 03 유지
+- 사용자 추가 요구: immutable 형용사/명사 후보, SecureRandom Bean, 별도 16-byte avatarSeed, 제한 재시도와 생성 실패 정책, 프로필 이미지 URL 응답
+- 저장·응답 권고: AnonymousVisitor와 BlogComment에는 avatarImageKey를 snapshot 저장하고 목록·작성·재생성 응답에는 avatarImageUrl을 제공
+- S3 범위: to-teacher-web-blog bucket의 character-image/ 정적 object만 참조하며 upload, delete, list, HEAD, presigned URL, AWS network 호출은 제외
+- 설정 권고: BLOG_AVATAR_IMAGE_BASE_URL을 .env.example에만 안내하고 main/test application 설정과 기존 S3Config/exams S3 코드는 변경하지 않음
+- 테스트 보강: 후보 목록, deterministic random, 16-byte seed, key 검증, URL 조립, 재시도 실패, comment snapshot, 세 API 응답, S3 무호출 검증을 64~73으로 추가
+- 미확정 사항: 실제 object filename·확장자, direct public S3와 CloudFront 중 제공 방식, object 접근 정책, nickname 명사와 이미지 mapping
+- 변경 범위: 계획서와 IMPLEMENTATION_STATUS.md만 변경하고 Java, 테스트, Gradle, application 설정은 수정하지 않음
+- 검증: 필수 heading과 DRAFT/PLANNING 상태, 테스트 64~73, trailing whitespace, `git diff --check`, branch와 변경 파일 범위를 확인함
+- 다음 단계: 위 미확정 사항과 계획 전체를 사용자가 명시적으로 승인하기 전 구현 금지
+
+### 2026-07-30 11:49:03 KST — Phase 03 조건부 승인 및 구현 시작
+
+- 상태: Phase 03 `IN_PROGRESS`, 계획 `APPROVED`, Current phase Phase 03 유지
+- 승인 근거: 사용자가 `PHASE-03-anonymous-comments.md`를 조건부 승인하고 API, 설정, profile image, validation, 테스트와 제외 범위를 확정함
+- 조건 변경: HMAC 환경변수는 BLOG_ANONYMOUS_TOKEN_SECRET, cookie는 BLOG_ANONYMOUS_COOKIE_*, avatar base는 BLOG_ANONYMOUS_AVATAR_BASE_URL을 사용함
+- profile 확정: CloudFront OAC와 비공개 S3, 외부 noun-image option 1:1 mapping, 두 option 이상, 재생성 시 adjective와 option 모두 변경
+- validation 확정: rule 1~10 유지, rule 3 비노출, 동일 code point 10회와 2~20 code point 구문 5회 반복 차단
+- 설정 범위: .env.example 변수 안내, main application.yml 최소 properties binding, application-test.yml 안전한 더미 secret/base URL/options만 수정
+- 제외 범위: 댓글 수정·삭제·운영 기능, Redis/IP/허니팟 차단, AWS SDK/API, CloudFront 설정, 실제 Mongo/S3 통합 테스트, SecurityConfig, exams 리팩터링
+- 시작 브랜치: `feat/blog-mvp`
+- 시작 작업 트리: 이전 Codex가 작성한 Phase 03 계획서와 상태 문서 변경만 존재함
+- 구현 원칙: 승인된 예상 파일 밖 변경이나 계약 차이가 필요하면 즉시 중단하고 사용자에게 보고함
+
+### 2026-07-30 13:10:51 KST — Phase 03 구현 완료 및 검증 시작
+
+- 상태: Phase 03 `VERIFYING`, 계획 `APPROVED`, Current phase Phase 03 유지
+- 구현 범위: 익명 방문자 cookie/HMAC, 랜덤 nickname·avatar, 댓글 snapshot Document, MongoTemplate 조회, programmatic index, rule 1~10 validation, 승인된 세 공개 API와 전용 validation 응답
+- 설정 범위: BLOG_ANONYMOUS_* 최소 binding, test dummy secret/CDN/options, `.env.example` 변수 안내만 반영함
+- 관련 테스트: 댓글 domain의 policy, Repository query, index, visitor/service, Controller 테스트 95개 성공
+- 실패 이력: 첫 보강 실행에서 한국어 조사와 붙은 `example.com을` 경계 1건이 실패해 ASCII domain boundary로 수정한 뒤 전체 댓글 테스트를 재실행해 성공함
+- 정적 사전 검사: `git diff --check` 성공, comment source에 AWS SDK/S3Presigner, RedisTemplate, Scheduling, PATCH/DELETE/internal/newsletter mapping 없음
+- 미구현 범위: 댓글 수정·삭제·운영 기능, Redis/IP/허니팟 차단, AWS API, 실제 Mongo/S3/CloudFront 통합, SecurityConfig와 exams 리팩터링
+- 다음 단계: 필수 전체 `clean test bootJar`, 기존 게시글·exams 회귀, 비밀값·응답 노출·금지 API 정적 review
+
+### 2026-07-30 13:17:39 KST — Phase 03 검증 완료
+
+- 상태: Phase 03 `DONE`, 계획 `EXECUTED`, Current phase Phase 04 `TODO`
+- 필수 검사: `git diff --check` 성공, 신규 파일 trailing whitespace 없음
+- 관련 테스트: `./gradlew test --tests 'web.tosunsaeng.domain.blog.comment.*'` 성공, 댓글 95개 failures/errors/skipped 0
+- 필수 전체 빌드: `./gradlew clean test bootJar` `BUILD SUCCESSFUL`
+- 전체 회귀: 총 158개 failures/errors/skipped 0; 기존 게시글 61개, application context와 exams Repository scan 포함
+- API review: 승인된 댓글 GET 1개와 POST 2개만 추가하고 댓글 PATCH/DELETE, 게시글 쓰기, newsletter, internal 운영 API는 추가하지 않음
+- validation review: 고정 rule 1~10과 rule 3 비노출, 전체 violation 수집·정렬, Unicode/HTML/Markdown/URL/email/spam 경계, save 금지 확인
+- 익명 보안 review: raw token은 Mongo/JSON/log에 없고 HMAC hash만 저장하며 HttpOnly/SameSite=Lax/Path/Max-Age/Secure cookie 정책 확인
+- profile review: SecureRandom, immutable 형용사와 외부 noun-image option, 별도 16-byte seed, 재생성, comment snapshot 불변, avatarImageUrl 공개와 key 비공개 확인
+- Mongo review: VISIBLE 조회와 stable sort/pagination/count, tokenHash unique 및 두 comment index 정의·idempotent 초기화 확인
+- 제외 범위 review: AWS SDK/API, Redis rate limit, IP, 허니팟 차단, Scheduling, SecurityConfig, 실제 Mongo/S3/CloudFront 통합, 관련 없는 exams 변경 없음
+- 승인 계획 차이: 한국어에 붙은 domain/HTTP 경계와 HTML event handler 오탐 보완, cookie Max-Age overflow fail-fast는 승인 의미 안의 정확도·안전성 구현이며 미승인 범위 차이 없음
+- 남은 위험: 실제 Mongo index/query와 CloudFront OAC/private S3 object 연동, 배포 site-cookie 구조, HMAC secret rotation, visitor/comment 다중 저장 원자성은 Phase 08 또는 후속 운영 검토 대상
+- 다음 단계: 사용자의 코드 검토 전 Phase 04 계획이나 구현을 시작하지 않음
+
+### 2026-07-30 13:20:10 KST — Phase 03 완료 상태 최종 확인
+
+- 상태: 계획 `EXECUTED`, Phase 03 `DONE`, Current phase Phase 04 `TODO`를 재확인함
+- 브랜치: `feat/blog-mvp` 유지
+- 완료 문서 반영 후 `git diff --check`와 신규 파일 trailing whitespace 검사가 성공함
+- 상태 검색의 shell quoting 실패 1회는 read-only였고 파일 또는 Git 상태에 영향이 없으며 수정된 명령으로 재확인함
+- 사용자 검토를 기다리며 Phase 04 계획이나 구현은 시작하지 않음

@@ -22,6 +22,14 @@ spring:
       max-file-size: 10MB      # 파일 하나당 최대 크기 (필요 시 20MB 등으로 늘리세요)
       max-request-size: 10MB   # 요청 하나당 최대 크기
 
+blog:
+  anonymous:
+    token-secret: ${BLOG_ANONYMOUS_TOKEN_SECRET:}
+    cookie-secure: ${BLOG_ANONYMOUS_COOKIE_SECURE:true}
+    cookie-max-age-days: ${BLOG_ANONYMOUS_COOKIE_MAX_AGE_DAYS:180}
+  anonymous-profile:
+    avatar-base-url: ${BLOG_ANONYMOUS_AVATAR_BASE_URL:}
+
 jwt:
   secret: ${JWT_SECRET_KEY:ThisIsATemporarySecretKeyForTosunsaengProject2026!@#}
 

@@ -31,7 +31,13 @@ public enum ErrorStatus implements BaseErrorCode {
     _BLOG_PAGE_NEGATIVE(HttpStatus.BAD_REQUEST, "BLOG_4003", "page는 0 이상이어야 합니다."),
     _BLOG_POST_NOT_FOUND(HttpStatus.NOT_FOUND, "BLOG_4004", "게시글을 찾을 수 없습니다."),
     _BLOG_SIZE_TOO_SMALL(HttpStatus.BAD_REQUEST, "BLOG_4005", "size는 1 이상이어야 합니다."),
-    _BLOG_SIZE_TOO_LARGE(HttpStatus.BAD_REQUEST, "BLOG_4006", "size는 100 이하여야 합니다.");
+    _BLOG_SIZE_TOO_LARGE(HttpStatus.BAD_REQUEST, "BLOG_4006", "size는 100 이하여야 합니다."),
+
+    // Blog Comment
+    _COMMENT_VALIDATION_FAILED(
+            HttpStatus.BAD_REQUEST,
+            "COMMENT_4001",
+            "댓글 작성 규칙을 확인해 주세요.");
 
     private final HttpStatus httpStatus;
     private final String code;

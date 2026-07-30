@@ -11,3 +11,16 @@ spring:
         secret-key: test-secret-key
       s3:
         bucket: test-bucket
+
+blog:
+  anonymous:
+    token-secret: test-only-anonymous-token-secret-at-least-32-bytes
+    cookie-secure: false
+    cookie-max-age-days: 180
+  anonymous-profile:
+    avatar-base-url: https://cdn.example.test
+    avatar-options:
+      - noun: 수달
+        image-key: character-image/example-otter-v1.webp
+      - noun: 펭귄
+        image-key: character-image/example-penguin-v1.webp
