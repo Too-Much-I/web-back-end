@@ -1,9 +1,9 @@
 # 블로그 MVP 구현 상태
 
 - 전체 상태: `IN_PROGRESS`
-- 현재 단계: `Phase 02 — 게시글 목록·상세·제목 검색`
+- 현재 단계: `Phase 03 — 익명 댓글과 번호 기반 validation`
 - 현재 브랜치: `feat/blog-mvp`
-- 마지막 수정 시각: `2026-07-29 16:41:05 KST (+09:00)`
+- 마지막 수정 시각: `2026-07-29 17:38:50 KST (+09:00)`
 
 ## 단계별 상태
 
@@ -11,7 +11,7 @@
 |---|---|---|
 | 00 | Agent guardrails 및 저장소 분석 | `DONE` |
 | 01 | Java 21, 테스트, Mongo 스캔, Scheduling, 로컬 환경 | `DONE` |
-| 02 | 게시글 목록·상세·제목 검색 | `TODO` |
+| 02 | 게시글 목록·상세·제목 검색 | `DONE` |
 | 03 | 익명 댓글과 번호 기반 validation | `TODO` |
 | 04 | 댓글 rate limit과 숨김·복원 | `TODO` |
 | 05 | 뉴스레터 구독과 구독 해지 | `TODO` |
@@ -23,9 +23,57 @@
 
 - Phase 01은 승인 범위 구현과 필수 검증을 완료해 `DONE`이다.
 - `docs/blog-mvp/plans/PHASE-01-infrastructure.md`는 `EXECUTED`다.
-- 현재 단계 Phase 02는 `TODO`이며 계획 수립과 구현을 시작하지 않았다.
+- Phase 02는 승인 범위 구현, 필수 테스트, 전체 build와 Codex review를 완료해 `DONE`이다.
+- `docs/blog-mvp/plans/PHASE-02-blog-read-search.md`는 `EXECUTED`다.
+- 현재 단계는 Phase 03이며 `TODO`다. Phase 03 계획이나 구현은 시작하지 않았다.
 
 ## 변경 파일
+
+Phase 02 계획 수립에서 변경한 파일:
+
+- `docs/blog-mvp/plans/PHASE-02-blog-read-search.md`
+- `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+
+Phase 02 계획 수립에서 수정하지 않는 파일:
+
+- Java 소스와 기존 테스트 전체
+- `build.gradle`, `src/main/resources/application.yml`, `src/test/resources/application-test.yml`
+- `src/main/java/web/tosunsaeng/global/config/SecurityConfig.java`
+
+Phase 02 구현에서 생성한 파일:
+
+- `src/main/java/web/tosunsaeng/domain/blog/api/BlogPostRestController.java`
+- `src/main/java/web/tosunsaeng/domain/blog/application/BlogPostService.java`
+- `src/main/java/web/tosunsaeng/domain/blog/application/BlogPostServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/blog/config/BlogPostMongoIndexInitializer.java`
+- `src/main/java/web/tosunsaeng/domain/blog/converter/BlogPostConverter.java`
+- `src/main/java/web/tosunsaeng/domain/blog/domain/entity/BlogPost.java`
+- `src/main/java/web/tosunsaeng/domain/blog/domain/enums/BlogPostStatus.java`
+- `src/main/java/web/tosunsaeng/domain/blog/domain/policy/BlogPostSlugPolicy.java`
+- `src/main/java/web/tosunsaeng/domain/blog/domain/repository/BlogPostRepository.java`
+- `src/main/java/web/tosunsaeng/domain/blog/domain/repository/BlogPostQueryRepository.java`
+- `src/main/java/web/tosunsaeng/domain/blog/domain/repository/BlogPostQueryRepositoryImpl.java`
+- `src/main/java/web/tosunsaeng/domain/blog/dto/BlogPostResponseDTO.java`
+- `src/main/java/web/tosunsaeng/domain/blog/exception/BlogPostException.java`
+- `src/main/java/web/tosunsaeng/global/config/ClockConfig.java`
+- `src/test/java/web/tosunsaeng/domain/blog/api/BlogPostRestControllerTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/application/BlogPostServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/config/BlogPostMongoIndexInitializerTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/domain/policy/BlogPostSlugPolicyTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/domain/repository/BlogPostQueryRepositoryImplTest.java`
+
+Phase 02 구현에서 수정한 파일:
+
+- `src/main/java/web/tosunsaeng/global/error/code/status/SuccessStatus.java`
+- `src/main/java/web/tosunsaeng/global/error/code/status/ErrorStatus.java`
+- `docs/blog-mvp/plans/PHASE-02-blog-read-search.md`
+- `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+
+Phase 02 구현에서 변경하지 않은 보호 파일:
+
+- `build.gradle`, 운영/test application 설정, `SecurityConfig`
+- `src/main/java/web/tosunsaeng/TosunsaengApplication.java`
+- 기존 `src/main/java/web/tosunsaeng/domain/exams/**`와 기존 테스트
 
 Phase 01에서 변경한 파일:
 
@@ -145,6 +193,42 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 신규 파일 whitespace 확인: `rg` trailing whitespace 검색
 - 최종 범위 확인: `git status --short --untracked-files=all`, `git diff --stat`, `git diff --check`
 
+### 2026-07-29 17:12:33 KST — Phase 02 계획 수립 명령
+
+- 계획서 생성 전 필수 문서 확인: `cat`으로 `AGENTS.md`, `REQUIREMENTS.md`, `WORKFLOW.md`, `IMPLEMENTATION_STATUS.md`, `PLANS.md` 순서대로 읽음
+- 시작 조건: `git branch --show-current`, `git status --short`, `scripts/codex-preflight.sh`
+- 대상 파일 목록: `rg --files`, `find`, `wc -l`로 exams, 공통 응답, 실제 status package, 전역 예외, 전체 test, 전체 main source를 확인
+- exams 구조 분석: `awk`와 `cat`으로 Controller, Service interface/impl, Converter, Request/Response DTO, 전체 Document, enum, Repository, 도메인 예외를 읽음
+- 공통 구조 분석: `awk`와 `cat`으로 `BaseResponse`, `global/error/code/status/**`, `global/exception/**`를 읽고 `rg`로 ErrorStatus 참조 위치를 확인
+- 애플리케이션·테스트 분석: `cat`과 `awk`로 `TosunsaengApplication`, 기존 전체 test와 test profile, `build.gradle`을 읽음
+- 저장소 선례 검색: `rg`로 API mapping, Pageable/Page, page metadata, 날짜·시간, Mongo index, MongoTemplate/Criteria/Query 사용을 검색
+- 보조 설정 확인: `cat`으로 `SecurityConfig`, `application.yml`, `.github/workflows/deploy.yml`, `compose.local.yml`, `RestTemplateConfig`, `SchedulingConfig`, `RedisConfig`를 읽음
+- 시각 확인: `date '+%Y-%m-%d %H:%M:%S %Z (%z)'`
+- 문서 작성: `apply_patch`로 Phase 02 DRAFT 계획서 생성과 Phase 02 `PLANNING` 상태 및 Session Log 반영
+- 계획서 생성 직후 필수 재확인: `cat`으로 `AGENTS.md`, `REQUIREMENTS.md`, `WORKFLOW.md`, `IMPLEMENTATION_STATUS.md`, `PLANS.md`, Phase 02 계획서 순서대로 다시 읽음
+- 문서 검증: heading `rg`, `git status --short --untracked-files=all`, trailing whitespace `rg`, `git diff --check`, 상태 문서 `git diff`, 최종 시각 확인
+
+### 2026-07-29 17:38:50 KST — Phase 02 구현 및 검증 명령
+
+- 필수 문서 확인: `cat`으로 `AGENTS.md`, `REQUIREMENTS.md`, `WORKFLOW.md`, `IMPLEMENTATION_STATUS.md`, `PLANS.md`, Phase 02 계획서 순서대로 읽음
+- 시작 조건: `git branch --show-current`, `git status --short --untracked-files=all`
+- 승인 시각 확인과 상태 반영: `date`, `apply_patch`, `rg`로 계획 `APPROVED`, Phase 02 `IN_PROGRESS`, 현재 단계 Phase 02 확인
+- 구현 directory 준비: 승인된 main/test blog package에 한정한 `mkdir -p`
+- 구현: `apply_patch`로 BlogPost/상태/slug 정책, Clock, Repository/custom query, index initializer, DTO/Converter, Service, Controller, success/error status 추가
+- 테스트 구현: `apply_patch`로 slug policy, index, Repository Query BSON, Service, MockMvc Controller 테스트 추가
+- 검증 상태 반영: `apply_patch`로 Phase 02 `VERIFYING`과 Session Log 추가
+- 초기 범위 확인: `git status --short --untracked-files=all`, `git diff --check`, 금지 mapping·기능 `rg`
+- 첫 Phase 02 테스트: 샌드박스 내부 Gradle cache lock 접근 제한으로 task 실행 전 실패; 승인된 외부 `./gradlew test --tests 'web.tosunsaeng.domain.blog.*'` 재실행 성공
+- 첫 테스트 결과 확인: Gradle XML에서 Phase 02 57개, failures/errors/skipped 0 확인
+- 테스트 보강: 상세·검색 공통 공개 query, 안정 정렬/count, null 검색, 검색 pagination 회귀 test 추가
+- 보강 테스트 첫 실행: Phase 02 61개 중 검색 content/count Query BSON 동등성 1건 실패
+- 실패 분석: test source line 확인 후 동일 검색 Criteria를 content/count에서 재사용하도록 Repository 구현 수정
+- 보강 테스트 재실행: `./gradlew test --tests 'web.tosunsaeng.domain.blog.*'` 성공
+- 필수 정적 검사: `git diff --check` 성공
+- 필수 전체 검증: 승인된 외부 `./gradlew clean test bootJar` 성공
+- 전체 결과 확인: Gradle XML에서 Phase 02 61개와 기존 2개, 총 63개 failures/errors/skipped 0 확인
+- Codex review: status, 보호 파일 diff, API mapping, Newsletter/Redis/Scheduling/`Instant.now` 부재, 비밀값 패턴, trailing whitespace를 병렬 정적 검사
+
 ## 테스트 결과
 
 ### 초기 검증 결과
@@ -199,18 +283,50 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 승인 제외 파일과 exams 비즈니스 코드: 변경 없음
 - Codex review: 고정 요구사항, 제외 범위, 승인 계획, 실제 변경 파일 사이에 미승인 차이 없음
 
+### Phase 02 계획 수립 검증 결과
+
+- `scripts/codex-preflight.sh`: 성공
+- 필수 관리 문서와 새 Phase 02 계획서의 생성 직후 재독: 완료
+- `PLANS.md` 필수 heading과 사용자 지정 계획 항목: 모두 존재
+- 변경 문서 trailing whitespace 검색: 없음
+- `git diff --check`: 성공
+- 변경 파일: Phase 02 계획서와 상태 문서 두 개뿐임
+- Phase 상태: Phase 02만 `TODO`에서 `PLANNING`으로 변경, Phase 00·01 및 Phase 03~08 상태 유지
+- Java, 기존 테스트, Gradle, application 설정, API, Mongo Document: 변경 없음
+- 구현 테스트와 Gradle build: 계획 전용 작업이므로 실행하지 않음
+
+### Phase 02 구현 검증 결과
+
+- 첫 Phase 02 테스트: 57개 성공, failures/errors/skipped 0
+- 보강 테스트 첫 실행: 61개 중 1개 실패; 검색 content/count Criteria가 동일 의미의 별도 Pattern 객체를 가져 BSON 객체 동등성 assertion 실패
+- 수정 후 Phase 02 테스트: 61개 성공, failures/errors/skipped 0
+- `./gradlew clean test bootJar`: `BUILD SUCCESSFUL`
+- 전체 테스트: Phase 02 61개 + 기존 context/exams 2개 = 총 63개, failures/errors/skipped 0
+- `git diff --check`: 성공
+- 변경 문서와 신규 Java/test trailing whitespace: 없음
+- API mapping: `GET /api/posts`, `GET /api/posts/search`, `GET /api/posts/{slug}` 세 개만 존재
+- 쓰기 API와 댓글·뉴스레터 API 부정 MockMvc 테스트: 성공
+- 보호 파일: `build.gradle`, application 설정, SecurityConfig, TosunsaengApplication, exams 비즈니스 코드 변경 없음
+- 비밀값 패턴, Newsletter 필드, Redis, Scheduling 작업, Testcontainers: 추가 없음
+- 실제 MongoDB 통합 테스트: 승인 범위에서 제외, Phase 08 전체 검수 과제로 유지
+- Codex review: 고정 요구사항, 승인 계획, 제외 범위와 실제 변경 사이에 미승인 차이 없음
+
 ## 열린 문제
 
 - Java 17 기반 `Dokerfile`은 참조되지 않는 것으로 확인됐지만 이번 Phase에서는 삭제하지 않는다.
 - 기존 exams의 기능 수준 회귀 테스트가 없어 Phase 01 계획의 보장 범위는 context 기동과 Repository Bean 등록까지다.
 - test context가 localhost MongoClient를 생성해 background monitor의 연결 거부 로그가 남지만 Repository method를 호출하거나 연결 성공을 요구하지 않으며 테스트는 통과한다.
 - GitHub Actions의 실제 main 배포는 금지된 push·배포를 실행하지 않았으므로 repository 내 정적 순서와 YAML까지만 검증했다.
+- `/api/posts/search` 때문에 직접 MongoDB에 게시글을 등록할 때 `search` slug 예약 규칙을 계속 지켜야 한다.
+- 실제 Mongo index/query 동작은 Query BSON과 mock index 정의까지만 검증했으며 실제 MongoDB 통합 검증은 Phase 08 전체 검수 과제로 남긴다.
+- case-insensitive unanchored title regex는 데이터 증가 시 검색 성능 위험이 있다.
+- 비-test 시작 시 index 생성 실패를 명시적으로 전파하므로 Mongo 장애나 기존 중복 slug가 있으면 애플리케이션 시작이 실패한다.
 
 ## 다음 작업
 
-1. 사용자가 Phase 01 변경과 검증 결과를 검토한다.
-2. 사용자 검토 전에는 Phase 02 계획이나 구현을 시작하지 않는다.
-3. Phase 02 작업 요청을 받으면 필수 문서와 작업 트리를 다시 확인하고 계획서 작성만을 위한 `PLANNING`부터 시작한다.
+1. 사용자가 Phase 02 코드와 검증 결과를 검토한다.
+2. Phase 03은 `TODO`이며 별도 계획 수립 요청과 승인 전에는 구현하지 않는다.
+3. Phase 08 전체 검수에서 실제 MongoDB index/query 통합 테스트를 수행할 테스트 인프라를 결정한다.
 
 ## Session Log
 
@@ -310,3 +426,59 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 승인 계획 차이: 조건부 승인에서 확정한 최소 test profile과 정적 Compose 검증을 반영했으며 미승인 차이 없음
 - 남은 위험: Java 17 `Dokerfile` 잔존, exams 기능 통합 테스트 부재, localhost Mongo monitor 연결 거부 로그, 실제 GitHub Actions 배포 미실행
 - 다음 단계: 사용자 검토 전 Phase 02 작업 시작 금지
+
+### 2026-07-29 17:06:32 KST — Phase 02 계획 수립 시작
+
+- 상태: Phase 02 `PLANNING`, 계획 `DRAFT`
+- 브랜치: `feat/blog-mvp`
+- 시작 시 작업 트리: 깨끗함
+- 사전 점검: `scripts/codex-preflight.sh` 성공
+- 작업 범위: 지정된 코드와 관리 문서의 읽기 전용 분석, Phase 02 DRAFT 계획서 작성, 상태 문서 갱신만 수행
+- 금지 범위: Java 소스, 테스트, Gradle, application 설정, API, Mongo Document 수정·생성 및 모든 구현 작업
+
+### 2026-07-29 17:12:33 KST — Phase 02 DRAFT 계획서 작성 완료
+
+- 상태: Phase 02 `PLANNING`, 계획 `DRAFT`
+- 변경 파일: `docs/blog-mvp/plans/PHASE-02-blog-read-search.md`, `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+- 분석 결과: exams에 페이지네이션 선례와 영속 시간 선례가 없고, Mongo auto-index 및 test Mongo 의존성이 없으며, 공통 status 실제 경로는 `global/error/code/status`임
+- 권고안: `Instant`와 UTC Clock, MongoTemplate custom query의 단일 공개 Criteria, 최대 두 번의 batch 관련 글 조회, programmatic blog index 초기화, 최대 size 100
+- 테스트 전략: 기존 test dependency로 Repository Query BSON, Service, MockMvc Controller, index definition을 단위 검증하고 전체 기존 테스트를 회귀 실행
+- 재독·정적 검증: 계획서 생성 직후 필수 문서 재독, 필수 heading, whitespace, `git diff --check`, 변경 범위 확인 성공
+- 미변경 범위: Java, 기존 테스트, Gradle, application 설정, SecurityConfig, exams 및 모든 API 구현
+- 다음 단계: 사용자 명시적 승인 전 계획 `APPROVED` 및 Phase 02 `IN_PROGRESS` 전환과 구현 금지
+
+### 2026-07-29 17:19:07 KST — Phase 02 계획 승인 및 구현 시작
+
+- 상태: Phase 02 `IN_PROGRESS`, 계획 `APPROVED`, 현재 단계 Phase 02 유지
+- 승인 근거: 사용자가 `PHASE-02-blog-read-search.md`를 명시적으로 승인하고 구현 범위와 확정 결정 사항을 제시함
+- 시작 브랜치: `feat/blog-mvp`
+- 시작 작업 트리: 이전 Codex가 작성한 Phase 02 계획서와 상태 문서 변경만 존재함
+- 승인 시 확정: 최대 size 100, `Instant`/UTC Clock, 발행 경계 포함, publishedAt/createdAt/id DESC 안정 정렬, `search` 예약 slug, programmatic index, 세분화된 pagination 오류
+- 테스트 제한: 실제 Mongo 통합 테스트와 Testcontainers는 제외하고 Query BSON 단위 테스트를 수행하며 실제 Mongo index/query 통합 검증은 Phase 08 과제로 기록함
+- 제외 범위: 쓰기·관리자·댓글·뉴스레터 API, Redis, Scheduling 작업, 내부 인증, SecurityConfig, build/application 설정, exams 비즈니스 로직, 관련 없는 리팩터링
+- 구현 원칙: 승인된 예상 파일과 확정 계약 밖의 변경이 필요하면 즉시 중단하고 보고함
+
+### 2026-07-29 17:30:54 KST — Phase 02 구현 완료 및 검증 시작
+
+- 상태: Phase 02 `VERIFYING`, 계획 `APPROVED`, 현재 단계 Phase 02 유지
+- 구현 범위: BlogPost/상태/slug 정책, UTC Clock, custom Mongo query, programmatic index, 목록·상세·검색·관련 글, BaseResponse status와 승인 테스트
+- 공개 조건: PUBLISHED, publishedAt exists/non-null/`$lte`를 Repository helper 한 곳에 적용
+- 안정 정렬: publishedAt DESC, createdAt DESC, `_id` DESC를 목록·검색·최신 관련 글 보충에 적용
+- 미구현 범위: 쓰기·관리자·댓글·뉴스레터 API, 등록 스크립트, Redis, Scheduling 작업, 내부 인증, SecurityConfig, Gradle/application 설정, Testcontainers
+- 다음 단계: 정적 검사, 관련 테스트, `./gradlew clean test bootJar`, 승인 범위와 실제 diff review
+
+### 2026-07-29 17:38:50 KST — Phase 02 검증 완료
+
+- 상태: Phase 02 `DONE`, 계획 `EXECUTED`, 현재 단계 Phase 03 `TODO`
+- 필수 검사: `git diff --check` 성공
+- 필수 빌드: `./gradlew clean test bootJar` `BUILD SUCCESSFUL`
+- 테스트: Phase 02 61개와 기존 context/exams 2개, 총 63개 failures/errors/skipped 0
+- 실패 이력: 보강 테스트 첫 실행에서 검색 content/count Query BSON 동등성 1건 실패 후 Criteria 재사용으로 수정하고 전체 재검증 성공
+- API review: 승인된 GET 세 개만 존재하고 게시글 쓰기·댓글·뉴스레터 API 없음
+- query review: 공개 Criteria 단일 helper, `$lte` 경계 포함, 안정 정렬, 동일 count filter, regex quote/case-insensitive, 관련 글 batch 조회 확인
+- index review: idempotent `ensureIndex`, slug unique, status/publishedAt compound, 예외 미흡수, test profile 비활성화 확인
+- 보존 review: exams, BaseResponse, 전역 advice, SecurityConfig, Gradle/application 설정 미변경
+- 비밀값 review: 새 실제 비밀값 패턴 없음
+- 승인 계획 차이: 승인 메시지에서 확정한 slug 정책 파일과 Criteria 재사용 수정 외 미승인 차이 없음
+- 남은 위험: 실제 Mongo index/query 통합 검증은 Phase 08 과제, regex 성능, 직접 DB 등록 시 slug 규칙, index 생성 실패 시 시작 차단
+- 다음 단계: 사용자 검토 전 Phase 03 계획이나 구현 시작 금지

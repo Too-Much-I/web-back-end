@@ -23,7 +23,15 @@ public enum ErrorStatus implements BaseErrorCode {
     _AI_SERVER_CONNECTION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXAM_4001", "AI 채점 서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요."),
     _QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND, "EXAM_4002", "해당 문제를 찾을 수 없습니다."),
     _EXAM_ALREADY_COMPLETED(HttpStatus.ALREADY_REPORTED, "EXAM_4003", "이미 채점이 완료된 시험 세션입니다."),
-    _AI_SERVER_PROCESSING_NOW(HttpStatus.BAD_REQUEST, "EXAM_4006", "현재 채점이 진행 중입니다. 잠시 후 다시 시도해 주세요.");
+    _AI_SERVER_PROCESSING_NOW(HttpStatus.BAD_REQUEST, "EXAM_4006", "현재 채점이 진행 중입니다. 잠시 후 다시 시도해 주세요."),
+
+    // Blog
+    _BLOG_SEARCH_QUERY_TOO_SHORT(HttpStatus.BAD_REQUEST, "BLOG_4001", "검색어는 앞뒤 공백 제거 후 2자 이상이어야 합니다."),
+    _BLOG_SEARCH_QUERY_TOO_LONG(HttpStatus.BAD_REQUEST, "BLOG_4002", "검색어는 앞뒤 공백 제거 후 50자 이하여야 합니다."),
+    _BLOG_PAGE_NEGATIVE(HttpStatus.BAD_REQUEST, "BLOG_4003", "page는 0 이상이어야 합니다."),
+    _BLOG_POST_NOT_FOUND(HttpStatus.NOT_FOUND, "BLOG_4004", "게시글을 찾을 수 없습니다."),
+    _BLOG_SIZE_TOO_SMALL(HttpStatus.BAD_REQUEST, "BLOG_4005", "size는 1 이상이어야 합니다."),
+    _BLOG_SIZE_TOO_LARGE(HttpStatus.BAD_REQUEST, "BLOG_4006", "size는 100 이하여야 합니다.");
 
     private final HttpStatus httpStatus;
     private final String code;

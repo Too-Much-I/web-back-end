@@ -21,7 +21,12 @@ public enum SuccessStatus implements BaseCode {
     RECIPE_INFO(HttpStatus.OK, "RECIPE_201", "성공적으로 레시피의 상세 정보를 조회했습니다."),
     RECIPE_FIND(HttpStatus.OK, "RECIPE_202", "성공적으로 레시피를 검색했습니다."),
     RECIPE_SCRAP(HttpStatus.OK, "RECIPE_203", "성공적으로 레피시를 찜했습니다."),
-    RECIPE_DELETE_SCRAP(HttpStatus.OK, "RECIPE_204", "성공적으로 레피시 찜을 취소했습니다.");
+    RECIPE_DELETE_SCRAP(HttpStatus.OK, "RECIPE_204", "성공적으로 레피시 찜을 취소했습니다."),
+
+    // Blog
+    BLOG_POST_LIST(HttpStatus.OK, "BLOG_200", "게시글 목록을 조회했습니다."),
+    BLOG_POST_DETAIL(HttpStatus.OK, "BLOG_201", "게시글 상세를 조회했습니다."),
+    BLOG_POST_SEARCH(HttpStatus.OK, "BLOG_202", "게시글을 검색했습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
