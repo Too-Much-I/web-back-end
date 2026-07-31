@@ -11,16 +11,22 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import web.tosunsaeng.domain.newsletter.api.NewsletterRestController;
+import web.tosunsaeng.domain.newsletter.api.NewsletterOneClickUnsubscribeController;
 import web.tosunsaeng.domain.newsletter.dto.NewsletterResponseDTO;
 import web.tosunsaeng.global.common.response.BaseResponse;
 import web.tosunsaeng.global.error.code.status.BaseErrorCode;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = NewsletterRestController.class)
+@RestControllerAdvice(assignableTypes = {
+        NewsletterRestController.class,
+        NewsletterOneClickUnsubscribeController.class
+})
 public class NewsletterExceptionAdvice {
 
     private static final String UNSUBSCRIBE_PATH = "/api/newsletter/unsubscribe";
+    private static final String ONE_CLICK_PREFIX =
+            "/api/newsletter/one-click-unsubscribe/";
 
     @ExceptionHandler(NewsletterRateLimitException.class)
     public ResponseEntity<BaseResponse<NewsletterResponseDTO.RateLimitFailureResult>>
@@ -74,6 +80,8 @@ public class NewsletterExceptionAdvice {
     }
 
     private boolean isUnsubscribe(HttpServletRequest request) {
-        return request != null && UNSUBSCRIBE_PATH.equals(request.getRequestURI());
+        return request != null
+                && (UNSUBSCRIBE_PATH.equals(request.getRequestURI())
+                || request.getRequestURI().startsWith(ONE_CLICK_PREFIX));
     }
 }

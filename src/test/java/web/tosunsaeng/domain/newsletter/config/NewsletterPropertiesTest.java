@@ -1,8 +1,12 @@
 package web.tosunsaeng.domain.newsletter.config;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import web.tosunsaeng.domain.comment.config.AnonymousSessionProperties;
 import web.tosunsaeng.domain.comment.config.BlogCommentAbuseProperties;
+import web.tosunsaeng.domain.newsletter.domain.enums.NewsletterEmailProvider;
 
 import java.util.Map;
 
@@ -122,6 +126,87 @@ class NewsletterPropertiesTest {
                         reusedToken, rate, anonymous, comment).afterPropertiesSet())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("달라야");
+    }
+
+    @Test
+    void deliveryDefaultsAreSafeAndBounded() {
+        NewsletterDeliveryProperties properties = new NewsletterDeliveryProperties();
+
+        properties.afterPropertiesSet();
+
+        assertThat(properties.isSendingEnabled()).isFalse();
+        assertThat(properties.getEmailProvider()).isEqualTo(NewsletterEmailProvider.LOGGING);
+        assertThat(properties.getSendDelayMinutes()).isEqualTo(15);
+        assertThat(properties.getBatchSize()).isEqualTo(100);
+        assertThat(properties.getWorkerCount()).isEqualTo(2);
+        assertThat(properties.getQueueCapacity()).isEqualTo(100);
+        assertThat(properties.getReconciliationDelayMs()).isEqualTo(60_000);
+        assertThat(properties.getCampaignDelayMs()).isEqualTo(10_000);
+        assertThat(properties.getDeliveryDelayMs()).isEqualTo(5_000);
+        assertThat(properties.getRetryDelayMs()).isEqualTo(30_000);
+        assertThat(properties.getStaleRecoveryDelayMs()).isEqualTo(60_000);
+        assertThat(properties.isTestSendingEnabled()).isFalse();
+        assertThat(properties.getTestRecipientAllowlist()).isEmpty();
+    }
+
+    @Test
+    void enabledDeliveryRequiresSeparateHttpsOriginsAndFromAddress() {
+        NewsletterDeliveryProperties properties = enabledDeliveryProperties();
+
+        properties.afterPropertiesSet();
+
+        assertThat(properties.getPublicBaseUrl()).isEqualTo("https://www.example.test");
+        assertThat(properties.getApiBaseUrl()).isEqualTo("https://api.example.test");
+
+        properties.setApiBaseUrl("http://api.example.test");
+        assertThatThrownBy(properties::afterPropertiesSet)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("NEWSLETTER_API_BASE_URL");
+    }
+
+    @Test
+    void deliveryRejectsUnboundedOrHeaderInjectingConfiguration() {
+        NewsletterDeliveryProperties invalidBatch = new NewsletterDeliveryProperties();
+        invalidBatch.setBatchSize(0);
+        assertThatThrownBy(invalidBatch::afterPropertiesSet)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("batch size");
+
+        NewsletterDeliveryProperties invalidQueue = new NewsletterDeliveryProperties();
+        invalidQueue.setQueueCapacity(0);
+        assertThatThrownBy(invalidQueue::afterPropertiesSet)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("queue capacity");
+
+        NewsletterDeliveryProperties invalidName = new NewsletterDeliveryProperties();
+        invalidName.setFromName("토선생\r\nBcc: victim@example.test");
+        assertThatThrownBy(invalidName::afterPropertiesSet)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("줄바꿈");
+    }
+
+    @Test
+    void blankAllowlistEnvironmentBindingProducesAnEmptyList() {
+        NewsletterDeliveryProperties properties = new Binder(
+                new MapConfigurationPropertySource(Map.of(
+                        "newsletter.delivery.test-recipient-allowlist", "")))
+                .bind(
+                        "newsletter.delivery",
+                        Bindable.of(NewsletterDeliveryProperties.class))
+                .orElseThrow(() -> new AssertionError("delivery properties binding failed"));
+
+        properties.afterPropertiesSet();
+
+        assertThat(properties.getTestRecipientAllowlist()).isEmpty();
+    }
+
+    private NewsletterDeliveryProperties enabledDeliveryProperties() {
+        NewsletterDeliveryProperties properties = new NewsletterDeliveryProperties();
+        properties.setSendingEnabled(true);
+        properties.setFromEmail("newsletter@example.test");
+        properties.setPublicBaseUrl("https://www.example.test");
+        properties.setApiBaseUrl("https://api.example.test");
+        return properties;
     }
 
     private NewsletterUnsubscribeTokenProperties tokenProperties(

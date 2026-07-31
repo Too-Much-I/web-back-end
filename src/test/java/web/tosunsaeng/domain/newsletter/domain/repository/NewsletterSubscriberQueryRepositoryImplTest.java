@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -119,6 +120,49 @@ class NewsletterSubscriberQueryRepositoryImplTest {
                 .thenReturn(null);
 
         assertThat(repository.reactivateByEmail("user@example.com", NOW)).isEmpty();
+    }
+
+    @Test
+    void activeCursorQueryExcludesUnsubscribedAndBounced() {
+        when(mongoTemplate.find(any(Query.class), eq(NewsletterSubscriber.class)))
+                .thenReturn(List.of());
+
+        repository.findActiveAfterId(null, 100);
+
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(captor.capture(), eq(NewsletterSubscriber.class));
+        Query query = captor.getValue();
+        assertThat(query.getQueryObject())
+                .containsEntry("status", NewsletterSubscriberStatus.ACTIVE);
+        assertThat(query.getSortObject()).isEqualTo(new Document("_id", 1));
+        assertThat(query.getLimit()).isEqualTo(100);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void activeCursorStartsStrictlyAfterLastSeenId() {
+        when(mongoTemplate.find(any(Query.class), eq(NewsletterSubscriber.class)))
+                .thenReturn(List.of());
+
+        repository.findActiveAfterId("subscriber-100", 20);
+
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(captor.capture(), eq(NewsletterSubscriber.class));
+        List<Document> clauses = (List<Document>) captor.getValue()
+                .getQueryObject()
+                .get("$and");
+        assertThat(clauses.get(0))
+                .containsEntry("status", NewsletterSubscriberStatus.ACTIVE);
+        assertThat(clauses.get(1).get("_id"))
+                .isEqualTo(new Document("$gt", "subscriber-100"));
+        assertThat(captor.getValue().getLimit()).isEqualTo(20);
+    }
+
+    @Test
+    void activeCursorRejectsNonPositiveBatchWithoutMongoCall() {
+        assertThat(repository.findActiveAfterId(null, 0)).isEmpty();
+
+        verifyNoInteractions(mongoTemplate);
     }
 
     private NewsletterSubscriber subscriber(

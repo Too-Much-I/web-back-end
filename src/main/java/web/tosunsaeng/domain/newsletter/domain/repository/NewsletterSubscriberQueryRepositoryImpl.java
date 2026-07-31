@@ -2,6 +2,7 @@ package web.tosunsaeng.domain.newsletter.domain.repository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -10,6 +11,7 @@ import web.tosunsaeng.domain.newsletter.domain.entity.NewsletterSubscriber;
 import web.tosunsaeng.domain.newsletter.domain.enums.NewsletterSubscriberStatus;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -57,5 +59,22 @@ public class NewsletterSubscriberQueryRepositoryImpl
                 update,
                 FindAndModifyOptions.options().returnNew(true),
                 NewsletterSubscriber.class));
+    }
+
+    @Override
+    public List<NewsletterSubscriber> findActiveAfterId(String lastSeenId, int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        Criteria active = Criteria.where("status").is(NewsletterSubscriberStatus.ACTIVE);
+        Criteria criteria = lastSeenId == null
+                ? active
+                : new Criteria().andOperator(
+                        active,
+                        Criteria.where("_id").gt(lastSeenId));
+        Query query = Query.query(criteria)
+                .with(Sort.by(Sort.Order.asc("_id")))
+                .limit(limit);
+        return mongoTemplate.find(query, NewsletterSubscriber.class);
     }
 }

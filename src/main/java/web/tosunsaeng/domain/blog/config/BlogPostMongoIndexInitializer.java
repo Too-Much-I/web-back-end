@@ -20,6 +20,8 @@ public class BlogPostMongoIndexInitializer implements ApplicationRunner {
 
     static final String SLUG_INDEX_NAME = "uk_blog_posts_slug";
     static final String PUBLICATION_INDEX_NAME = "idx_blog_posts_status_published_at";
+    static final String NEWSLETTER_RECONCILIATION_INDEX_NAME =
+            "idx_blog_posts_newsletter_reconciliation";
 
     private final MongoTemplate mongoTemplate;
 
@@ -28,7 +30,12 @@ public class BlogPostMongoIndexInitializer implements ApplicationRunner {
         IndexOperations indexOperations = mongoTemplate.indexOps(BlogPost.class);
         indexOperations.ensureIndex(slugIndex());
         indexOperations.ensureIndex(publicationIndex());
-        log.info("Ensured MongoDB indexes: {}, {}", SLUG_INDEX_NAME, PUBLICATION_INDEX_NAME);
+        indexOperations.ensureIndex(newsletterReconciliationIndex());
+        log.info(
+                "Ensured MongoDB indexes: {}, {}, {}",
+                SLUG_INDEX_NAME,
+                PUBLICATION_INDEX_NAME,
+                NEWSLETTER_RECONCILIATION_INDEX_NAME);
     }
 
     static Index slugIndex() {
@@ -43,5 +50,14 @@ public class BlogPostMongoIndexInitializer implements ApplicationRunner {
                 .on("status", Sort.Direction.ASC)
                 .on("publishedAt", Sort.Direction.DESC)
                 .named(PUBLICATION_INDEX_NAME);
+    }
+
+    static Index newsletterReconciliationIndex() {
+        return new Index()
+                .on("status", Sort.Direction.ASC)
+                .on("newsletterEnabled", Sort.Direction.ASC)
+                .on("publishedAt", Sort.Direction.ASC)
+                .on("_id", Sort.Direction.ASC)
+                .named(NEWSLETTER_RECONCILIATION_INDEX_NAME);
     }
 }

@@ -10,6 +10,8 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.IndexDefinition;
 import org.springframework.data.mongodb.core.index.IndexOperations;
+import web.tosunsaeng.domain.newsletter.domain.entity.NewsletterCampaign;
+import web.tosunsaeng.domain.newsletter.domain.entity.NewsletterDelivery;
 import web.tosunsaeng.domain.newsletter.domain.entity.NewsletterSubscriber;
 
 import java.util.List;
@@ -29,36 +31,58 @@ class NewsletterMongoIndexInitializerTest {
     private MongoTemplate mongoTemplate;
 
     @Mock
-    private IndexOperations indexOperations;
+    private IndexOperations subscriberIndexOperations;
+
+    @Mock
+    private IndexOperations campaignIndexOperations;
+
+    @Mock
+    private IndexOperations deliveryIndexOperations;
 
     @Test
-    void ensuresUniqueEmailAndStatusIndexesIdempotently() throws Exception {
+    void ensuresSubscriberCampaignAndDeliveryIndexesIdempotently() throws Exception {
         when(mongoTemplate.indexOps(NewsletterSubscriber.class))
-                .thenReturn(indexOperations);
+                .thenReturn(subscriberIndexOperations);
+        when(mongoTemplate.indexOps(NewsletterCampaign.class))
+                .thenReturn(campaignIndexOperations);
+        when(mongoTemplate.indexOps(NewsletterDelivery.class))
+                .thenReturn(deliveryIndexOperations);
         NewsletterMongoIndexInitializer initializer =
                 new NewsletterMongoIndexInitializer(mongoTemplate);
 
         initializer.run(null);
         initializer.run(null);
 
-        ArgumentCaptor<IndexDefinition> captor =
+        ArgumentCaptor<IndexDefinition> subscriberCaptor =
                 ArgumentCaptor.forClass(IndexDefinition.class);
-        verify(indexOperations, times(4)).ensureIndex(captor.capture());
-        List<IndexDefinition> definitions = captor.getAllValues();
-        assertEmailIndex(definitions.get(0));
-        assertStatusIndex(definitions.get(1));
-        assertThat(definitions.get(2).getIndexKeys())
-                .isEqualTo(definitions.get(0).getIndexKeys());
-        assertThat(definitions.get(3).getIndexKeys())
-                .isEqualTo(definitions.get(1).getIndexKeys());
+        verify(subscriberIndexOperations, times(4)).ensureIndex(subscriberCaptor.capture());
+        List<IndexDefinition> subscriberDefinitions = subscriberCaptor.getAllValues();
+        assertEmailIndex(subscriberDefinitions.get(0));
+        assertStatusIndex(subscriberDefinitions.get(1));
+        assertThat(subscriberDefinitions.get(2).getIndexKeys())
+                .isEqualTo(subscriberDefinitions.get(0).getIndexKeys());
+        assertThat(subscriberDefinitions.get(3).getIndexKeys())
+                .isEqualTo(subscriberDefinitions.get(1).getIndexKeys());
+
+        ArgumentCaptor<IndexDefinition> campaignCaptor =
+                ArgumentCaptor.forClass(IndexDefinition.class);
+        verify(campaignIndexOperations, times(8)).ensureIndex(campaignCaptor.capture());
+        assertCampaignIndexes(campaignCaptor.getAllValues().subList(0, 4));
+        assertCampaignIndexes(campaignCaptor.getAllValues().subList(4, 8));
+
+        ArgumentCaptor<IndexDefinition> deliveryCaptor =
+                ArgumentCaptor.forClass(IndexDefinition.class);
+        verify(deliveryIndexOperations, times(8)).ensureIndex(deliveryCaptor.capture());
+        assertDeliveryIndexes(deliveryCaptor.getAllValues().subList(0, 4));
+        assertDeliveryIndexes(deliveryCaptor.getAllValues().subList(4, 8));
     }
 
     @Test
     void indexCreationFailureIsNotSwallowed() {
         when(mongoTemplate.indexOps(NewsletterSubscriber.class))
-                .thenReturn(indexOperations);
+                .thenReturn(subscriberIndexOperations);
         doThrow(new IllegalStateException("index conflict"))
-                .when(indexOperations)
+                .when(subscriberIndexOperations)
                 .ensureIndex(any(IndexDefinition.class));
         NewsletterMongoIndexInitializer initializer =
                 new NewsletterMongoIndexInitializer(mongoTemplate);
@@ -88,5 +112,65 @@ class NewsletterMongoIndexInitializerTest {
         assertThat(definition.getIndexOptions().getString("name"))
                 .isEqualTo(NewsletterMongoIndexInitializer.STATUS_INDEX_NAME);
         assertThat(definition.getIndexOptions().containsKey("unique")).isFalse();
+    }
+
+    private void assertCampaignIndexes(List<IndexDefinition> definitions) {
+        assertIndex(
+                definitions.get(0),
+                new Document("postId", 1),
+                NewsletterMongoIndexInitializer.CAMPAIGN_POST_INDEX_NAME,
+                true);
+        assertIndex(
+                definitions.get(1),
+                new Document("status", 1).append("scheduledAt", 1),
+                NewsletterMongoIndexInitializer.CAMPAIGN_SCHEDULE_INDEX_NAME,
+                false);
+        assertIndex(
+                definitions.get(2),
+                new Document("status", 1).append("claimExpiresAt", 1),
+                NewsletterMongoIndexInitializer.CAMPAIGN_CLAIM_INDEX_NAME,
+                false);
+        assertIndex(
+                definitions.get(3),
+                new Document("status", 1).append("updatedAt", 1),
+                NewsletterMongoIndexInitializer.CAMPAIGN_UPDATED_INDEX_NAME,
+                false);
+    }
+
+    private void assertDeliveryIndexes(List<IndexDefinition> definitions) {
+        assertIndex(
+                definitions.get(0),
+                new Document("postId", 1).append("subscriberId", 1),
+                NewsletterMongoIndexInitializer.DELIVERY_RECIPIENT_INDEX_NAME,
+                true);
+        assertIndex(
+                definitions.get(1),
+                new Document("campaignId", 1).append("status", 1),
+                NewsletterMongoIndexInitializer.DELIVERY_CAMPAIGN_INDEX_NAME,
+                false);
+        assertIndex(
+                definitions.get(2),
+                new Document("status", 1).append("nextRetryAt", 1),
+                NewsletterMongoIndexInitializer.DELIVERY_RETRY_INDEX_NAME,
+                false);
+        assertIndex(
+                definitions.get(3),
+                new Document("status", 1).append("claimExpiresAt", 1),
+                NewsletterMongoIndexInitializer.DELIVERY_CLAIM_INDEX_NAME,
+                false);
+    }
+
+    private void assertIndex(
+            IndexDefinition definition,
+            Document keys,
+            String name,
+            boolean unique) {
+        assertThat(definition.getIndexKeys()).isEqualTo(keys);
+        assertThat(definition.getIndexOptions().getString("name")).isEqualTo(name);
+        if (unique) {
+            assertThat(definition.getIndexOptions().getBoolean("unique")).isTrue();
+        } else {
+            assertThat(definition.getIndexOptions().containsKey("unique")).isFalse();
+        }
     }
 }

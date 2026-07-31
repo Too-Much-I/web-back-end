@@ -81,6 +81,42 @@ class NewsletterTelemetryPrivacyConfigTest {
         assertThat(get.getRequest().getQueryString()).isNotNull();
     }
 
+    @Test
+    void redactsOneClickPathTokenFromSentryEvent() {
+        SentryEvent event = new SentryEvent();
+        event.setRequest(sensitiveRequest(
+                "https://api.example.test/api/newsletter/one-click-unsubscribe/signed-sensitive-token"));
+
+        new NewsletterTelemetryPrivacyConfig()
+                .newsletterBeforeSendCallback()
+                .execute(event, new Hint());
+
+        assertSanitized(event.getRequest());
+        assertThat(event.getRequest().getUrl())
+                .isEqualTo("https://api.example.test/api/newsletter/one-click-unsubscribe/{token}")
+                .doesNotContain("signed-sensitive-token");
+    }
+
+    @Test
+    void dropsOneClickTransactionBecauseSdkCannotSafelyRenameIt() {
+        SentryTransaction transaction = new SentryTransaction(
+                "POST /api/newsletter/one-click-unsubscribe/signed-sensitive-token",
+                1.0,
+                2.0,
+                List.of(),
+                Map.of(),
+                null,
+                new TransactionInfo("custom"));
+        transaction.setRequest(sensitiveRequest(
+                "https://api.example.test/api/newsletter/one-click-unsubscribe/signed-sensitive-token"));
+
+        SentryTransaction result = new NewsletterTelemetryPrivacyConfig()
+                .newsletterBeforeSendTransactionCallback()
+                .execute(transaction, new Hint());
+
+        assertThat(result).isNull();
+    }
+
     private Request sensitiveRequest(String url) {
         Request request = new Request();
         request.setMethod("POST");

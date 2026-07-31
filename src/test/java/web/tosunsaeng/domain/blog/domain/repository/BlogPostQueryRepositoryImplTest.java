@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -205,6 +206,56 @@ class BlogPostQueryRepositoryImplTest {
                 .isEqualTo(List.of("current", "selected"));
         assertStableSort(query.getSortObject());
         assertThat(query.getLimit()).isEqualTo(2);
+    }
+
+    @Test
+    void newsletterEligibilityRequiresPublishedNonNullAndExplicitOptIn() {
+        when(mongoTemplate.find(any(Query.class), eq(BlogPost.class))).thenReturn(List.of());
+        BlogPostQueryRepositoryImpl repository = new BlogPostQueryRepositoryImpl(mongoTemplate);
+
+        repository.findNewsletterEligiblePostsAfter(null, 100);
+
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(captor.capture(), eq(BlogPost.class));
+        Document criteria = captor.getValue().getQueryObject();
+        assertThat(criteria)
+                .containsEntry("status", BlogPostStatus.PUBLISHED)
+                .containsEntry("newsletterEnabled", true);
+        Document publishedAt = criteria.get("publishedAt", Document.class);
+        assertThat(publishedAt)
+                .containsEntry("$exists", true)
+                .containsKey("$ne");
+        assertThat(publishedAt.get("$ne")).isNull();
+        assertThat(publishedAt).doesNotContainKeys("$lte", "$lt");
+        assertThat(captor.getValue().getSortObject()).isEqualTo(new Document("_id", 1));
+        assertThat(captor.getValue().getLimit()).isEqualTo(100);
+    }
+
+    @Test
+    void newsletterEligibilityUsesStableIdCursor() {
+        when(mongoTemplate.find(any(Query.class), eq(BlogPost.class))).thenReturn(List.of());
+        BlogPostQueryRepositoryImpl repository = new BlogPostQueryRepositoryImpl(mongoTemplate);
+
+        repository.findNewsletterEligiblePostsAfter("post-010", 25);
+
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(captor.capture(), eq(BlogPost.class));
+        List<Document> clauses = andClauses(captor.getValue().getQueryObject());
+        assertThat(clauses.get(0))
+                .containsEntry("status", BlogPostStatus.PUBLISHED)
+                .containsEntry("newsletterEnabled", true);
+        assertThat(clauses.get(1).get("_id"))
+                .isEqualTo(new Document("$gt", "post-010"));
+        assertThat(captor.getValue().getLimit()).isEqualTo(25);
+    }
+
+    @Test
+    void newsletterEligibilityRejectsNonPositiveBatchWithoutMongoCall() {
+        BlogPostQueryRepositoryImpl repository = new BlogPostQueryRepositoryImpl(mongoTemplate);
+
+        assertThat(repository.findNewsletterEligiblePostsAfter(null, 0)).isEmpty();
+
+        verifyNoInteractions(mongoTemplate);
     }
 
     private Query capturePublicListQuery(PageRequest pageRequest) {

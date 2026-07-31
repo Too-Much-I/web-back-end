@@ -96,6 +96,27 @@ public class BlogPostQueryRepositoryImpl implements BlogPostQueryRepository {
         return mongoTemplate.find(query, BlogPost.class);
     }
 
+    @Override
+    public List<BlogPost> findNewsletterEligiblePostsAfter(
+            String lastSeenId,
+            int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        Criteria eligible = Criteria.where("status").is(BlogPostStatus.PUBLISHED)
+                .and("publishedAt").exists(true).ne(null)
+                .and("newsletterEnabled").is(true);
+        Criteria criteria = lastSeenId == null
+                ? eligible
+                : new Criteria().andOperator(
+                        eligible,
+                        Criteria.where("_id").gt(lastSeenId));
+        Query query = Query.query(criteria)
+                .with(Sort.by(Sort.Order.asc("_id")))
+                .limit(limit);
+        return mongoTemplate.find(query, BlogPost.class);
+    }
+
     private Criteria publicCriteria(Instant now) {
         return Criteria.where("status").is(BlogPostStatus.PUBLISHED)
                 .and("publishedAt").exists(true).ne(null).lte(now);

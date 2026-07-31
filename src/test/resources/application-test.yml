@@ -38,3 +38,13 @@ newsletter:
   subscribe-rate-limit:
     secret: test-only-newsletter-subscribe-rate-secret-at-least-32-bytes
     enabled: false
+  delivery:
+    sending-enabled: false
+    email-provider: logging
+    from-email: newsletter@example.test
+    from-name: 토선생
+    public-base-url: https://www.example.test
+    api-base-url: https://api.example.test
+    test-sending-enabled: false
+    test-recipient-allowlist:
+      - allowed@example.test

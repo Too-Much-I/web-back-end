@@ -1,9 +1,9 @@
 # 블로그 MVP 구현 상태
 
 - 전체 상태: `IN_PROGRESS`
-- 현재 단계: `Phase 06 — 뉴스레터 15분 자동 발송`
+- 현재 단계: `Phase 07 — 내부 운영 API와 보안`
 - 현재 브랜치: `feat/blog-mvp`
-- 마지막 수정 시각: `2026-07-31 11:02:45 KST (+09:00)`
+- 마지막 수정 시각: `2026-07-31 14:18:26 KST (+09:00)`
 
 ## 단계별 상태
 
@@ -15,7 +15,7 @@
 | 03 | 익명 댓글과 번호 기반 validation | `DONE` |
 | 04 | 댓글 rate limit과 숨김·복원 | `DONE` |
 | 05 | 뉴스레터 구독과 구독 해지 | `DONE` |
-| 06 | 뉴스레터 15분 자동 발송 | `TODO` |
+| 06 | 뉴스레터 15분 자동 발송 | `DONE` |
 | 07 | 내부 운영 API와 보안 | `TODO` |
 | 08 | 전체 회귀 테스트와 API 문서 | `TODO` |
 
@@ -31,7 +31,12 @@
 - `docs/blog-mvp/plans/PHASE-04-comment-abuse-moderation.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
 - Phase 05는 승인 구현과 필수 검증을 완료해 `DONE`이다.
 - `docs/blog-mvp/plans/PHASE-05-newsletter-subscription.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
-- Current phase는 Phase 06이며 상태는 `TODO`다.
+- Phase 06은 승인 범위 구현과 필수 검증을 완료해 `DONE`이다.
+- `docs/blog-mvp/plans/PHASE-06-newsletter-delivery.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
+- Current phase는 Phase 07이며 상태는 `TODO`다.
+- Phase 06은 DB 직접 작성 BlogPost reconciliation, 15분 예약, Campaign/Delivery unique와 원자 claim, bounded 발송, SES v2, retry, kill switch 및 RFC 8058을 구현했다.
+- 조건부 승인은 claimExpiresAt, SecureRandom token, kill switch의 상태 무변경, 개별 AWS SDK 2.29.52, public/API base URL 분리, path token one-click과 test send allowlist를 확정했다.
+- Phase 06에서는 공개 one-click unsubscribe POST를 제외한 운영 Controller, `/internal/newsletter/**`, API Key 인증과 SecurityConfig 변경을 구현하지 않는다.
 - Phase 05는 즉시 ACTIVE 구독, 정규화 email unique, 조건부 재구독, stateless HMAC 해지 token과 newsletter 전용 IP rate limit을 승인 범위로 구현한다.
 - 공개 API는 subscribe POST와 JSON body 기반 unsubscribe POST 두 개뿐이며 GET unsubscribe, verify, email 발송, Scheduler와 internal API는 구현하지 않는다.
 - 저장소에는 Redis Cluster·Sentinel·다중 primary 설정이 없고 단일 `REDIS_HOST`/`REDIS_PORT`만 있어 Phase 04는 standalone/single-primary를 전제로 한다.
@@ -40,6 +45,104 @@
 - duplicate reservation은 Mongo save 전에 owner token으로 만들고 Mongo 실패 시 owner 일치 Lua로만 해제하며 rate counter는 rollback하지 않는다.
 
 ## 변경 파일
+
+Phase 06 구현에서 생성한 main 파일:
+
+- `src/main/java/web/tosunsaeng/domain/newsletter/api/NewsletterOneClickUnsubscribeController.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/application/NewsletterCampaignService.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/application/NewsletterCampaignServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/application/NewsletterDeliveryService.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/application/NewsletterDeliveryServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/application/NewsletterOperationsService.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/application/NewsletterOperationsServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/config/NewsletterDeliveryConfig.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/config/NewsletterDeliveryProperties.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/entity/NewsletterCampaign.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/entity/NewsletterDelivery.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/enums/NewsletterCampaignStatus.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/enums/NewsletterDeliveryStatus.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/enums/NewsletterEmailProvider.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/enums/NewsletterFailureType.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterClaimTokenGenerator.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterEmailTemplateRenderer.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterLinkBuilder.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterRetryPolicy.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterCampaignQueryRepository.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterCampaignQueryRepositoryImpl.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterCampaignRepository.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterDeliveryQueryRepository.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterDeliveryQueryRepositoryImpl.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterDeliveryRepository.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/sender/NewsletterEmailMessage.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/sender/NewsletterEmailSendException.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/sender/NewsletterEmailSendResult.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/sender/NewsletterEmailSender.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/infrastructure/email/LoggingNewsletterEmailSender.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/infrastructure/email/SesNewsletterEmailSender.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/scheduler/NewsletterCampaignScheduler.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/scheduler/NewsletterDeliveryScheduler.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/scheduler/NewsletterMaintenanceScheduler.java`
+
+Phase 06 구현에서 생성한 test 파일:
+
+- `src/test/java/web/tosunsaeng/domain/blog/domain/entity/BlogPostNewsletterOptInTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/api/NewsletterOneClickUnsubscribeControllerTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/application/NewsletterCampaignServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/application/NewsletterDeliveryServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/application/NewsletterOperationsServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/config/NewsletterDeliveryConfigTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterDeliveryPolicyTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterCampaignQueryRepositoryImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterDeliveryQueryRepositoryImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/infrastructure/email/LoggingNewsletterEmailSenderTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/infrastructure/email/SesNewsletterEmailSenderTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/scheduler/NewsletterSchedulersTest.java`
+
+Phase 06 구현에서 수정한 파일:
+
+- `.env.example`
+- `build.gradle`
+- `docs/blog-mvp/plans/PHASE-06-newsletter-delivery.md`
+- `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+- `src/main/resources/application.yml`
+- `src/test/resources/application-test.yml`
+- `src/main/java/web/tosunsaeng/domain/blog/config/BlogPostMongoIndexInitializer.java`
+- `src/main/java/web/tosunsaeng/domain/blog/domain/entity/BlogPost.java`
+- `src/main/java/web/tosunsaeng/domain/blog/domain/repository/BlogPostQueryRepository.java`
+- `src/main/java/web/tosunsaeng/domain/blog/domain/repository/BlogPostQueryRepositoryImpl.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/config/NewsletterMongoIndexInitializer.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/config/NewsletterTelemetryPrivacyConfig.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterSubscriberQueryRepository.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterSubscriberQueryRepositoryImpl.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/exception/NewsletterExceptionAdvice.java`
+- `src/test/java/web/tosunsaeng/domain/blog/config/BlogPostMongoIndexInitializerTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/domain/repository/BlogPostQueryRepositoryImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/config/NewsletterMongoIndexInitializerTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/config/NewsletterPropertiesTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/config/NewsletterTelemetryPrivacyConfigTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterSubscriberQueryRepositoryImplTest.java`
+
+Phase 06 구현에서 변경하지 않은 보호 파일과 범위:
+
+- `src/main/java/web/tosunsaeng/global/config/SecurityConfig.java`
+- `src/main/java/web/tosunsaeng/global/config/SchedulingConfig.java`
+- 기존 S3Config와 AWS access key 설정
+- 기존 subscribe/unsubscribe Controller 및 Service 계약
+- 기존 comment와 exams 비즈니스 코드
+- 운영 Controller, `/internal/newsletter/**`, API Key 인증과 Raw MIME
+
+Phase 06 계획 수립에서 변경한 파일:
+
+- `docs/blog-mvp/plans/PHASE-06-newsletter-delivery.md`
+- `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+
+Phase 06 계획 수립에서 수정하지 않는 파일:
+
+- Java 소스와 기존 테스트 전체
+- `build.gradle`, main/test application 설정과 `.env.example`
+- Mongo Document, Repository, Scheduler와 EmailSender
+- `SecurityConfig`, `SchedulingConfig`, 기존 S3Config
+- 기존 blog, newsletter subscription, comment와 exams 비즈니스 로직
 
 Phase 05 계획 수립에서 변경한 파일:
 
@@ -585,13 +688,21 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 방문자 저장 뒤 댓글 저장이 실패하면 방문자만 남을 수 있다. 실제 Mongo multi-document transaction 도입 여부는 Phase 08 통합 환경에서 검토한다.
 - 이미 댓글에 사용한 avatarImageKey object는 삭제하거나 덮어쓰지 않고 변경 시 versioned 새 key를 사용해야 한다.
 - 기존 SecurityConfig의 CSRF 비활성화는 Phase 03 제외 범위라 변경하지 않았다. SameSite=Lax와 실제 frontend/API site 구성을 배포 전에 확인해야 한다.
+- 실제 MongoDB의 Campaign/Delivery findAndModify 동시 claim, postId 및 postId/subscriberId unique 경쟁과 programmatic index 생성은 Phase 08 통합 환경에서 검증해야 한다.
+- 실제 SES sandbox/production 발송, identity·발신 주소 검증, sandbox 해제, IAM Role/default credential chain과 production quota는 Phase 08 운영 검수 대상이다.
+- SES domain DKIM을 활성화하고 `List-Unsubscribe` 및 `List-Unsubscribe-Post`가 DKIM 서명과 실제 수신 header에 포함되는지 확인해야 한다.
+- SES bounce 및 complaint event 연동이 없어 Phase 06 send 응답만으로 Subscriber BOUNCED를 갱신하지 않는다. event 연동은 Phase 08 또는 후속 단계 과제다.
+- 실제 Gmail 등 email client의 RFC 8058 one-click POST, redirect 부재, Content-Type/form field와 공개 API routing은 Phase 08에서 검증해야 한다.
+- one-click token이 URI path에 있어 application Sentry는 제거하지만 reverse proxy, load balancer, CDN과 access log 노출은 Phase 08 운영 설정에서 별도로 검수해야 한다.
+- frontend 구독 해지 확인 화면, CloudFront routing, 실제 Redis 회귀와 대량 Subscriber 부하 및 bounded executor backpressure는 Phase 08 통합 검증 대상이다.
+- SES는 application idempotency key를 제공하지 않으므로 provider가 수락한 뒤 응답 저장 전 장애 경계의 exactly-once는 보장하지 않는다. `PROVIDER_RESULT_UNKNOWN`은 자동·수동 재발송하지 않고 운영 검토가 필요하다.
 
 ## 다음 작업
 
-1. 사용자가 Phase 05 DRAFT의 BOUNCED 응답, token rotation key ring, 별도 rate limit secret과 GET 해지 위험을 검토하고 명시적으로 승인한다.
-2. 승인 전에는 Phase 05를 `IN_PROGRESS`로 변경하거나 Java, test, Gradle, application 설정과 API를 수정하지 않는다.
-3. 승인 후 예상 파일 범위 안에서 newsletter 구독·해지와 IP rate limit을 구현하고 관련 테스트와 전체 build를 수행한다.
-4. Phase 08 전체 검수에서 실제 Mongo unique/upsert, Redis Lua·TTL·동시성·topology, Sentry/web server query redaction과 email client scanner 동작을 검증한다.
+1. 사용자의 Phase 06 코드 검토를 기다리고 승인 전 Git add, commit 또는 push를 수행하지 않는다.
+2. Phase 07은 `TODO`로 유지하며 사용자가 요청하기 전 계획 수립이나 구현을 시작하지 않는다.
+3. Phase 07 계획에서는 운영 Controller를 `/internal/**`에 두고 API Key 인증과 SecurityConfig 변경을 별도 승인 범위로 다룬다.
+4. Phase 08 전체 검수에서 실제 Mongo claim 및 unique index, 실제 SES와 Redis, bounce/complaint, email client one-click, frontend/CDN path token log, DKIM과 대량 부하를 검증한다.
 
 ## Session Log
 
@@ -993,3 +1104,93 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 승인 계획 차이: 사용자가 후속 승인한 root comment/newsletter package와 `@RequiredArgsConstructor` 기준을 반영했으며 제품 API·상태·보안 계약 차이는 없음
 - Phase 08 이관: 실제 Mongo unique/동시 update, Redis Lua·TTL·원자성·standalone topology, Sentry outbound와 web/frontend/CDN query log, frontend 확인 page와 email scanner 동작 검증
 - 다음 단계: Phase 06은 `TODO`로 유지하며 사용자 코드 검토와 커밋 전 계획 또는 구현을 시작하지 않음
+
+### 2026-07-31 11:20:41 KST — Phase 06 DRAFT 계획 수립
+
+- 상태: Phase 06 `PLANNING`, 계획 `DRAFT`, Current phase Phase 06 유지
+- 시작 브랜치: `feat/blog-mvp`
+- 시작 작업 트리: clean
+- 사전 점검: `scripts/codex-preflight.sh` 성공
+- 선행 조건: Phase 05 `DONE`, Phase 05 계획 `EXECUTED`
+- 필수 문서: `AGENTS.md`, `PLANS.md`, `REQUIREMENTS.md`, `WORKFLOW.md`, 이 상태 문서와 Phase 05 계획서를 계획서 생성 전에 EOF까지 읽음
+- 분석 범위: 실제 root blog/newsletter/comment package 전체, SchedulingConfig, main/test application 설정, build, AWS SDK/S3, 기존 Scheduler·비동기, Phase 05 token/Subscriber/Repository와 programmatic index pattern
+- 실제 확인: BlogPost에는 newsletterEnabled가 없고 NewsletterSubscriber는 ACTIVE/UNSUBSCRIBED/BOUNCED와 tokenVersion을 가지며 newsletter Campaign, Delivery, Sender와 Scheduler는 없음
+- 주요 권고: BlogPost explicit opt-in plus 별도 Campaign, reconciliation, Campaign 및 Delivery 원자 claim, Subscriber cursor batch 100, worker 2와 bounded queue 100
+- 발송 권고: provider property 분리, local/test Logging sender, SES v2와 default credential chain, AWS SDK BOM 2.29.52, master kill switch 기본 false
+- 중복 및 실패 권고: Campaign postId unique, Delivery postId/subscriberId unique, 최초 plus retry 3회, provider outcome unknown 자동 재발송 금지
+- RFC 권고: 기존 JSON unsubscribe와 분리한 공개 one-click form POST를 Phase 06에 구현하고 GET, verify와 internal Controller는 만들지 않음
+- 변경 파일: Phase 06 계획서와 이 상태 문서 두 개뿐이며 Java, test, Gradle, application/env 설정과 Mongo Document는 수정하지 않음
+- 다음 단계: 생성 직후 필수 문서 재독과 정적 검증을 완료하고 사용자 명시적 승인을 기다림
+
+### 2026-07-31 11:33:08 KST — Phase 06 DRAFT 계획 검증
+
+- 문서 재독: 계획서 생성 후 AGENTS.md, REQUIREMENTS.md, WORKFLOW.md, 이 상태 문서, PLANS.md와 Phase 06 계획서를 EOF까지 재확인
+- 계획 구조: 상태 DRAFT와 사용자가 요구한 필수 항목, 제외 범위, 사용자 승인 필요 결정을 모두 확인
+- test 계획: 필수 1부터 69와 추가 안전 test 70부터 79까지 중복과 누락 없이 연속함을 awk로 확인
+- 상태 검토: Current phase Phase 06 유지, Phase 06만 `TODO` → `PLANNING`, 다른 Phase 상태 변경 없음
+- 변경 범위: `docs/blog-mvp/plans/PHASE-06-newsletter-delivery.md`와 `docs/blog-mvp/IMPLEMENTATION_STATUS.md` 두 문서만 변경
+- 정적 검증: 필수 heading, DRAFT/PLANNING 상태, trailing whitespace와 `git diff --check` 성공
+- 미실행: 계획 전용 작업이므로 Gradle test, MongoDB, Redis, AWS 호출과 실제 email 발송은 실행하지 않음
+- 다음 단계: DRAFT를 유지하고 BlogPost opt-in, kill switch, retry 횟수, RFC endpoint, AWS SDK와 test send 정책에 대한 사용자 명시적 승인을 기다림
+
+### 2026-07-31 12:43:36 KST — Phase 06 조건부 승인 및 구현 시작
+
+- 상태: Phase 06 `IN_PROGRESS`, 계획 `APPROVED`, Current phase Phase 06 유지
+- 승인 근거: 사용자가 수정된 Phase 06 계획을 조건부로 명시적 승인하고 구현 범위를 확정함
+- 시작 브랜치: `feat/blog-mvp`
+- 시작 작업 트리: 직전 Codex가 작성한 Phase 06 계획서와 이 상태 문서 변경만 존재
+- preflight: branch는 통과했고 알려진 Phase 06 문서 두 개가 미커밋이어서 clean-tree 검사만 실패
+- 선행 조건: Phase 00부터 05까지 `DONE`, Phase 05 계획 `EXECUTED`
+- 필수 문서: AGENTS.md, REQUIREMENTS.md, WORKFLOW.md, 이 상태 문서, PLANS.md, Phase 06 계획서를 근정 순서로 EOF까지 재확인
+- 조건 반영: Campaign/Delivery claimExpiresAt과 SecureRandom token, kill switch 무상태, AWS SDK 개별 2.29.52 유지, public/API base URL 분리, path token one-click, test send 이중 switch와 allowlist
+- 제외 유지: 기존 subscribe/unsubscribe 계약, verify/PENDING Subscriber, internal Controller/API Key/SecurityConfig, Raw MIME, Testcontainers와 실제 AWS/Mongo 통합 검증은 변경하지 않음
+- 우선 확인: SES v2 2.29.52 Simple custom header를 공식 model과 실제 SDK class로 확인한 뒤에만 Java 소스 구현 시작
+
+### 2026-07-31 14:03:07 KST — Phase 06 구현 완료 및 검증 시작
+
+- 상태: Phase 06 `VERIFYING`, 계획 `APPROVED`, Current phase Phase 06 유지
+- SES 선행 gate: 공식 service model과 실제 `sesv2-2.29.52` SDK class에서 Simple `Message.headers` 및 `MessageHeader` builder 지원을 확인했고 Raw MIME fallback을 추가하지 않음
+- AWS dependency: 기존 S3와 같은 개별 버전 `2.29.52`의 `sesv2`만 추가하고 BOM migration 또는 전체 SDK upgrade를 하지 않음
+- 구현: BlogPost explicit opt-in, 60초 reconciliation, Campaign/Delivery Document와 unique/index, 원자 claim 및 claimToken fencing, ACTIVE Subscriber `_id` cursor batch 생성, bounded executor와 역할별 Scheduler를 추가함
+- 발송 안전성: kill switch 기본 false, provider 호출 직전 Subscriber/BlogPost/Campaign 재검증, 최초 1회 + retry 3회, provider 결과 불명은 `PROVIDER_RESULT_UNKNOWN` 최종 실패로 처리함
+- email: Logging 및 SES v2 Sender port, HTML/plain template, public/API base URL 분리, UTM/수동 해지 link, Simple custom RFC 8058 header를 구현함
+- 공개 API: 기존 JSON subscribe/unsubscribe를 유지하고 form 기반 `POST /api/newsletter/one-click-unsubscribe/{token}`만 추가했으며 GET mapping, redirect, verify와 internal Controller는 추가하지 않음
+- 운영 Service: Controller 없이 test send 이중 switch/allowlist, SCHEDULED 취소와 기존 FAILED Delivery 수동 requeue를 구현함
+- 개인정보: Delivery에 email/token을 저장하지 않고 Logging sender와 Scheduler log에 recipient, token, body 또는 provider request/response를 남기지 않으며 one-click Sentry event URL은 치환하고 transaction은 drop함
+- 예비 검증: `compileJava`, `compileTestJava`, newsletter 전체 145개와 보강 대상 test, BlogPost 누락 opt-in Mongo mapping test가 성공함
+- 검증 중 보완: Campaign 상태 재확인 뒤 provider 전 claim 해제 fencing, executor 이중 초기화 제거, token/template 오류 분류, 빈 bulk error 비은폐와 누락 boolean Mongo mapping test를 보강함
+- 정적 사전 확인: 금지 package, Raw MIME, GET one-click, verify/internal Controller, SecurityConfig 변경과 newsletter 코드의 AWS key 추가가 없고 `git diff --check`가 성공함
+- 다음 검증: 지정 newsletter 전체 test, 전체 `clean test bootJar`, blog/comment/exams 회귀와 최종 제외 범위·민감 로그 정적 검사를 수행함
+
+### 2026-07-31 14:13:26 KST — Phase 06 검증 완료
+
+- 상태: Phase 06 `DONE`, 계획 `EXECUTED`, Current phase Phase 07 `TODO`
+- 필수 검사: `git diff --check` 성공, 변경 main/test/docs/config trailing whitespace 없음
+- 관련 테스트: `bash ./gradlew test --tests 'web.tosunsaeng.domain.newsletter.*'` `BUILD SUCCESSFUL`, newsletter 148개 failures/errors/skipped 0
+- 필수 전체 빌드: `bash ./gradlew clean test bootJar` `BUILD SUCCESSFUL`, 전체 368개 failures/errors/skipped 0, 60 MiB bootJar 생성 성공
+- 전체 회귀: blog 66개, comment 152개, newsletter 148개, exams Repository scan 1개와 application context 1개가 성공함
+- SES gate: 공식 service model과 `/private/tmp/codex-sesv2-2.29.52.jar`에서 Simple custom header API를 확인했고 build에는 기존 S3와 같은 개별 `sesv2:2.29.52` 한 줄만 추가함
+- atomic/중복 review: Campaign postId unique, Delivery postId/subscriberId unique, Campaign/Delivery findAndModify claim, SecureRandom 32 byte token과 old-token fencing, cursor bulk upsert 및 conditional cancel/retry를 확인함
+- kill switch review: 기본 false에서 reconciliation만 허용하고 Campaign/Delivery claim, retry, provider 및 test send를 차단하며 기존 SENDING field를 변경하지 않음
+- retry/stale review: provider 호출 직전 attemptCount 증가, 5분/30분/2시간, 총 4회, provider 전 stale은 PENDING, provider 후 stale은 `PROVIDER_RESULT_UNKNOWN` 및 자동·수동 retry 금지임
+- email/RFC review: Logging/SES port, HTML/plain, public/API origin 분리, UTM/수동 해지 link, Simple 두 custom header와 redirect 없는 별도 form POST를 확인함
+- 개인정보 review: Campaign/Delivery에 email/token을 저장하지 않고 일반 log에 전체 email, token, body, provider payload 또는 credential을 남기지 않으며 one-click Sentry path를 제거함
+- API/범위 review: 기존 subscribe 및 JSON unsubscribe 정상, one-click GET·verify·Subscriber PENDING·internal Controller·API Key·SecurityConfig·Raw MIME·옛 blog 하위 package가 없음
+- 실패 이력: 초기 compile에서 Spring Data exception package와 Sentry API 오사용을 수정했고, 첫 전체 build의 SecureRandom Bean 충돌은 newsletter 전용 claim token generator로 격리한 뒤 모든 필수 검증을 처음부터 재실행해 성공함
+- 실행 명령: 필수 문서 `sed`, 코드/설정/SDK `rg`·`sed`·`javap`, `git branch --show-current`, `git status --short`, `scripts/codex-preflight.sh`, `bash ./gradlew compileJava`, `compileTestJava`, newsletter/blog/context 선택 test, `git diff --check`, 필수 newsletter test와 `clean test bootJar`, test XML `awk`, bootJar `ls` 및 최종 정적 검색을 실행함
+- 외부 접근: 실제 MongoDB, Redis, SES, email client, AWS CLI, 운영 DB와 실제 구독자 발송은 실행하지 않음
+- Phase 08 이관: 실제 Mongo claim/index/unique, SES sandbox/production, Redis, bounce/complaint, email client one-click, frontend/CloudFront 및 path access log, DKIM header 서명, quota와 대량 부하
+- 승인 계획 차이: 별도 failure classifier를 SES sender 내부로 합치고 newsletter 전용 claim token generator 및 test-profile Scheduler 비활성화를 추가했으나 제품 동작·API·상태·보안·제외 범위 차이는 없음
+- 다음 단계: 사용자 코드 검토를 기다리며 요청 전 Phase 07 계획 또는 구현을 시작하지 않음
+
+### 2026-07-31 14:18:26 KST — Phase 06 최종 안전성 보강 및 재검증
+
+- 상태 유지: Phase 06 `DONE`, 계획 `EXECUTED`, Current phase Phase 07 `TODO`
+- 보강: SES의 안전한 error code allowlist로 throttling과 domain identity/sending configuration 오류를 구분하고 provider 원문은 폐기함
+- test send: 성공 이력 log는 postId와 provider만 기록하고 수신 email, token, HTML/plain body와 provider payload를 포함하지 않는 test를 추가함
+- 필수 검사 재실행: `git diff --check` 성공
+- 관련 테스트 재실행: `bash ./gradlew test --tests 'web.tosunsaeng.domain.newsletter.*'` `BUILD SUCCESSFUL`, newsletter 149개 failures/errors/skipped 0
+- 전체 검증 재실행: `bash ./gradlew clean test bootJar` `BUILD SUCCESSFUL`, 전체 369개 failures/errors/skipped 0, bootJar 생성 성공
+- 회귀 구성: blog 66개, comment 152개, newsletter 149개, exams Repository scan 1개와 application context 1개
+- 범위 재확인: SecurityConfig, 기존 API, Subscriber 상태, Raw MIME, internal Controller와 실제 외부 시스템 접근에 추가 변경 없음
+- 다음 단계: 사용자 코드 검토를 기다리며 Phase 07은 `TODO`로 유지함

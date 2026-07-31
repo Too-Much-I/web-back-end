@@ -36,15 +36,15 @@ class BlogPostMongoIndexInitializerTest {
         initializer.run(null);
 
         ArgumentCaptor<IndexDefinition> indexCaptor = ArgumentCaptor.forClass(IndexDefinition.class);
-        verify(indexOperations, times(4)).ensureIndex(indexCaptor.capture());
+        verify(indexOperations, times(6)).ensureIndex(indexCaptor.capture());
         List<IndexDefinition> definitions = indexCaptor.getAllValues();
 
         assertSlugIndex(definitions.get(0));
         assertPublicationIndex(definitions.get(1));
-        assertThat(definitions.get(2).getIndexKeys()).isEqualTo(definitions.get(0).getIndexKeys());
-        assertThat(definitions.get(2).getIndexOptions()).isEqualTo(definitions.get(0).getIndexOptions());
-        assertThat(definitions.get(3).getIndexKeys()).isEqualTo(definitions.get(1).getIndexKeys());
-        assertThat(definitions.get(3).getIndexOptions()).isEqualTo(definitions.get(1).getIndexOptions());
+        assertNewsletterReconciliationIndex(definitions.get(2));
+        assertThat(definitions.get(3).getIndexKeys()).isEqualTo(definitions.get(0).getIndexKeys());
+        assertThat(definitions.get(4).getIndexKeys()).isEqualTo(definitions.get(1).getIndexKeys());
+        assertThat(definitions.get(5).getIndexKeys()).isEqualTo(definitions.get(2).getIndexKeys());
     }
 
     private void assertSlugIndex(IndexDefinition definition) {
@@ -59,6 +59,16 @@ class BlogPostMongoIndexInitializerTest {
                 .isEqualTo(new Document("status", 1).append("publishedAt", -1));
         assertThat(definition.getIndexOptions().getString("name"))
                 .isEqualTo(BlogPostMongoIndexInitializer.PUBLICATION_INDEX_NAME);
+        assertThat(definition.getIndexOptions().containsKey("unique")).isFalse();
+    }
+
+    private void assertNewsletterReconciliationIndex(IndexDefinition definition) {
+        assertThat(definition.getIndexKeys()).isEqualTo(new Document("status", 1)
+                .append("newsletterEnabled", 1)
+                .append("publishedAt", 1)
+                .append("_id", 1));
+        assertThat(definition.getIndexOptions().getString("name"))
+                .isEqualTo(BlogPostMongoIndexInitializer.NEWSLETTER_RECONCILIATION_INDEX_NAME);
         assertThat(definition.getIndexOptions().containsKey("unique")).isFalse();
     }
 }

@@ -30,6 +30,7 @@ public class BlogPost {
     private String seoDescription;
     private List<String> relatedPostSlugs;
     private Instant publishedAt;
+    private boolean newsletterEnabled;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -47,6 +48,7 @@ public class BlogPost {
             String seoDescription,
             List<String> relatedPostSlugs,
             Instant publishedAt,
+            boolean newsletterEnabled,
             Instant createdAt,
             Instant updatedAt) {
         BlogPostSlugPolicy.validate(slug);
@@ -62,6 +64,7 @@ public class BlogPost {
         this.seoDescription = seoDescription;
         this.relatedPostSlugs = relatedPostSlugs;
         this.publishedAt = publishedAt;
+        this.newsletterEnabled = newsletterEnabled;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }

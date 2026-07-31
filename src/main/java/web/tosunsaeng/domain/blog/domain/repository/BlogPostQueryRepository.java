@@ -23,4 +23,6 @@ public interface BlogPostQueryRepository {
             Collection<String> excludedSlugs,
             Instant now,
             int limit);
+
+    List<BlogPost> findNewsletterEligiblePostsAfter(String lastSeenId, int limit);
 }

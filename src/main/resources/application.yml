@@ -42,6 +42,27 @@ newsletter:
   subscribe-rate-limit:
     secret: ${NEWSLETTER_SUBSCRIBE_RATE_LIMIT_SECRET:}
     enabled: ${NEWSLETTER_SUBSCRIBE_RATE_LIMIT_ENABLED:true}
+  delivery:
+    sending-enabled: ${NEWSLETTER_SENDING_ENABLED:false}
+    email-provider: ${NEWSLETTER_EMAIL_PROVIDER:logging}
+    from-email: ${NEWSLETTER_FROM_EMAIL:}
+    from-name: ${NEWSLETTER_FROM_NAME:토선생}
+    public-base-url: ${NEWSLETTER_PUBLIC_BASE_URL:}
+    api-base-url: ${NEWSLETTER_API_BASE_URL:}
+    send-delay-minutes: ${NEWSLETTER_SEND_DELAY_MINUTES:15}
+    batch-size: ${NEWSLETTER_BATCH_SIZE:100}
+    worker-count: ${NEWSLETTER_WORKER_COUNT:2}
+    queue-capacity: ${NEWSLETTER_QUEUE_CAPACITY:100}
+    claim-ttl-seconds: ${NEWSLETTER_CLAIM_TTL_SECONDS:300}
+    reconciliation-delay-ms: ${NEWSLETTER_RECONCILIATION_DELAY_MS:60000}
+    campaign-delay-ms: ${NEWSLETTER_CAMPAIGN_DELAY_MS:10000}
+    delivery-delay-ms: ${NEWSLETTER_DELIVERY_DELAY_MS:5000}
+    retry-delay-ms: ${NEWSLETTER_RETRY_DELAY_MS:30000}
+    completion-delay-ms: ${NEWSLETTER_COMPLETION_DELAY_MS:30000}
+    stale-recovery-delay-ms: ${NEWSLETTER_STALE_RECOVERY_DELAY_MS:60000}
+    test-sending-enabled: ${NEWSLETTER_TEST_SENDING_ENABLED:false}
+    test-recipient-allowlist: ${NEWSLETTER_TEST_RECIPIENT_ALLOWLIST:}
+    aws-region: ${AWS_REGION:ap-northeast-2}
 
 jwt:
   secret: ${JWT_SECRET_KEY:ThisIsATemporarySecretKeyForTosunsaengProject2026!@#}
