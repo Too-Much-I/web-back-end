@@ -17,12 +17,8 @@ import java.util.Set;
 @Configuration(proxyBeanMethods = false)
 public class NewsletterTelemetryPrivacyConfig {
 
-    private static final Set<String> SENSITIVE_PATHS = Set.of(
-            "/api/newsletter/subscribe",
-            "/api/newsletter/unsubscribe");
     private static final String ONE_CLICK_PREFIX =
             "/api/newsletter/one-click-unsubscribe/";
-    private static final String INTERNAL_PREFIX = "/internal/";
     private static final String REDACTED_ONE_CLICK_PATH =
             "/api/newsletter/one-click-unsubscribe/{token}";
     private static final Set<String> SENSITIVE_HEADERS = Set.of(
@@ -77,31 +73,28 @@ public class NewsletterTelemetryPrivacyConfig {
     }
 
     static void sanitize(SentryEvent event) {
-        if (event == null || !isSensitiveRequest(event.getRequest())) {
+        if (event == null) {
             return;
         }
         sanitizeRequest(event.getRequest());
         event.setUser(null);
+        event.setBreadcrumbs(null);
+        event.setExtras(null);
+        event.setThrowable(null);
+        event.setMessage(null);
+        if (event.getExceptions() != null) {
+            event.getExceptions().forEach(exception -> exception.setValue(null));
+        }
     }
 
     static void sanitize(SentryTransaction transaction) {
-        if (transaction == null
-                || !isSensitiveRequest(transaction.getRequest())) {
+        if (transaction == null) {
             return;
         }
         sanitizeRequest(transaction.getRequest());
         transaction.setUser(null);
-    }
-
-    private static boolean isSensitiveRequest(Request request) {
-        if (request == null) {
-            return false;
-        }
-        String path = extractPath(request.getUrl());
-        return path != null && (path.startsWith(INTERNAL_PREFIX)
-                || path.startsWith(ONE_CLICK_PREFIX)
-                || ("POST".equalsIgnoreCase(request.getMethod())
-                && SENSITIVE_PATHS.contains(path)));
+        transaction.setBreadcrumbs(null);
+        transaction.setExtras(null);
     }
 
     private static String extractPath(String url) {
@@ -117,32 +110,67 @@ public class NewsletterTelemetryPrivacyConfig {
     }
 
     private static void sanitizeRequest(Request request) {
+        if (request == null) {
+            return;
+        }
         request.setData(null);
         request.setQueryString(null);
         request.setCookies(null);
         request.setUrl(sanitizeUrl(request.getUrl()));
-        request.setHeaders(removeSensitiveEntries(
-                request.getHeaders(),
-                SENSITIVE_HEADERS));
-        request.setEnvs(removeSensitiveEntries(
-                request.getEnvs(),
-                SENSITIVE_ENVS));
+        request.setHeaders(removeSensitiveHeaders(request.getHeaders()));
+        request.setEnvs(removeSensitiveEnvs(request.getEnvs()));
     }
 
-    private static Map<String, String> removeSensitiveEntries(
-            Map<String, String> source,
-            Set<String> sensitiveNames) {
+    private static Map<String, String> removeSensitiveHeaders(
+            Map<String, String> source) {
         if (source == null) {
             return null;
         }
         Map<String, String> sanitized = new LinkedHashMap<>();
         source.forEach((key, value) -> {
-            if (key != null
-                    && !sensitiveNames.contains(key.toLowerCase(Locale.ROOT))) {
+            if (key != null && !isSensitiveHeader(key)) {
                 sanitized.put(key, value);
             }
         });
         return sanitized;
+    }
+
+    private static Map<String, String> removeSensitiveEnvs(
+            Map<String, String> source) {
+        if (source == null) {
+            return null;
+        }
+        Map<String, String> sanitized = new LinkedHashMap<>();
+        source.forEach((key, value) -> {
+            if (key != null && !isSensitiveEnv(key)) {
+                sanitized.put(key, value);
+            }
+        });
+        return sanitized;
+    }
+
+    private static boolean isSensitiveHeader(String name) {
+        String normalized = name.toLowerCase(Locale.ROOT);
+        return SENSITIVE_HEADERS.contains(normalized)
+                || normalized.contains("forwarded")
+                || normalized.startsWith("proxy-")
+                || normalized.endsWith("-ip")
+                || normalized.equals("client-ip")
+                || normalized.equals("remote-addr")
+                || normalized.equals("via")
+                || normalized.equals("x-envoy-external-address");
+    }
+
+    private static boolean isSensitiveEnv(String name) {
+        String normalized = name.toLowerCase(Locale.ROOT);
+        return SENSITIVE_ENVS.contains(normalized)
+                || normalized.contains("forwarded")
+                || normalized.contains("remote_addr")
+                || normalized.contains("remote_host")
+                || normalized.contains("client_ip")
+                || normalized.contains("authorization")
+                || normalized.contains("cookie")
+                || normalized.contains("internal_api_key");
     }
 
     private static String withoutQueryAndFragment(String url) {

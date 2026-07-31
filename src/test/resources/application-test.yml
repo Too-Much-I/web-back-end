@@ -53,3 +53,11 @@ internal:
   api:
     enabled: false
     key: ""
+
+jwt:
+  secret: test-only-jwt-secret-at-least-32-bytes
+
+sentry:
+  dsn: ""
+  enabled: false
+  send-default-pii: false

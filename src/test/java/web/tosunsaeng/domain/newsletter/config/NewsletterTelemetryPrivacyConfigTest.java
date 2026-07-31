@@ -2,7 +2,9 @@ package web.tosunsaeng.domain.newsletter.config;
 
 import io.sentry.Hint;
 import io.sentry.SentryEvent;
+import io.sentry.protocol.Message;
 import io.sentry.protocol.Request;
+import io.sentry.protocol.SentryException;
 import io.sentry.protocol.SentryTransaction;
 import io.sentry.protocol.TransactionInfo;
 import io.sentry.protocol.User;
@@ -62,7 +64,7 @@ class NewsletterTelemetryPrivacyConfigTest {
     }
 
     @Test
-    void leavesOtherEndpointsAndNewsletterGetRequestsUntouched() {
+    void sanitizesRequestDataForEveryEndpointAndMethod() {
         SentryEvent other = new SentryEvent();
         other.setRequest(sensitiveRequest("https://api.example.test/api/posts"));
         SentryEvent get = new SentryEvent();
@@ -74,10 +76,38 @@ class NewsletterTelemetryPrivacyConfigTest {
         NewsletterTelemetryPrivacyConfig.sanitize(other);
         NewsletterTelemetryPrivacyConfig.sanitize(get);
 
-        assertThat(other.getRequest().getData()).isNotNull();
-        assertThat(other.getRequest().getQueryString()).isNotNull();
-        assertThat(get.getRequest().getData()).isNotNull();
-        assertThat(get.getRequest().getQueryString()).isNotNull();
+        assertSanitized(other.getRequest());
+        assertSanitized(get.getRequest());
+    }
+
+    @Test
+    void removesExceptionMessagesBreadcrumbsExtrasAndUserPii() {
+        String sentinel = "sensitive-user@example.test-token-comment";
+        SentryEvent event = new SentryEvent(new IllegalStateException(sentinel));
+        SentryException exception = new SentryException();
+        exception.setType(IllegalStateException.class.getName());
+        exception.setValue(sentinel);
+        event.setExceptions(List.of(exception));
+        Message message = new Message();
+        message.setFormatted(sentinel);
+        event.setMessage(message);
+        event.setExtra("requestBody", sentinel);
+        event.addBreadcrumb(sentinel);
+        User user = new User();
+        user.setEmail(sentinel);
+        event.setUser(user);
+
+        NewsletterTelemetryPrivacyConfig.sanitize(event);
+
+        assertThat(event.getMessage()).isNull();
+        assertThat(event.getThrowable()).isNull();
+        assertThat(event.getExceptions())
+                .singleElement()
+                .extracting(SentryException::getValue)
+                .isNull();
+        assertThat(event.getBreadcrumbs()).isNull();
+        assertThat(event.getExtras()).isNull();
+        assertThat(event.getUser()).isNull();
     }
 
     @Test

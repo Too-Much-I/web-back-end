@@ -30,22 +30,26 @@ jobs:
     - name: Run tests
       run: ./gradlew clean test
 
-    # 5. 배포용 jar 생성
+    # 5. 실제 MongoDB·Redis Testcontainers 통합 테스트
+    - name: Run integration tests
+      run: ./gradlew integrationTest
+
+    # 6. 배포용 jar 생성
     - name: Build bootJar
       run: ./gradlew bootJar
 
-    # 6. 도커 빌드 환경 준비
+    # 7. 도커 빌드 환경 준비
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
-    # 7. 도커 허브 로그인
+    # 8. 도커 허브 로그인
     - name: Login to Docker Hub
       uses: docker/login-action@v2
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    # 8. 이제 build/libs가 존재하므로 에러 없이 이미지 빌드 및 push 성공!
+    # 9. 이제 build/libs가 존재하므로 에러 없이 이미지 빌드 및 push 성공!
     - name: Build and push Docker image
       uses: docker/build-push-action@v4
       with:
@@ -56,7 +60,7 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    # 9. AWS EC2에 SSH로 원격 접속하여 도커 컴포즈 리스타트 땡기기
+    # 10. AWS EC2에 SSH로 원격 접속하여 도커 컴포즈 리스타트 땡기기
     - name: SSH Command to Deploy
       uses: appleboy/ssh-action@v0.1.10
       with:

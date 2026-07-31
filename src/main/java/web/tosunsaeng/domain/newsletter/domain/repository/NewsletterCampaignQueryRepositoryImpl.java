@@ -62,7 +62,7 @@ public class NewsletterCampaignQueryRepositoryImpl
                 .set("claimExpiresAt", claimExpiresAt)
                 .set("updatedAt", now);
         return mongoTemplate.updateFirst(query, update, NewsletterCampaign.class)
-                .getModifiedCount() == 1;
+                .getMatchedCount() == 1;
     }
 
     @Override

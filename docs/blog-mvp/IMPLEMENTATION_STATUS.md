@@ -1,9 +1,9 @@
 # 블로그 MVP 구현 상태
 
-- 전체 상태: `IN_PROGRESS`
-- 현재 단계: `Phase 08 — 전체 회귀 테스트와 API 문서`
+- 전체 상태: `IMPLEMENTATION_COMPLETE_PENDING_OPERATIONS`
+- 현재 단계: `COMPLETE`
 - 현재 브랜치: `feat/blog-mvp`
-- 마지막 수정 시각: `2026-07-31 15:31:29 KST (+09:00)`
+- 마지막 수정 시각: `2026-07-31 18:06:31 KST (+09:00)`
 
 ## 단계별 상태
 
@@ -17,7 +17,7 @@
 | 05 | 뉴스레터 구독과 구독 해지 | `DONE` |
 | 06 | 뉴스레터 15분 자동 발송 | `DONE` |
 | 07 | 내부 운영 API와 보안 | `DONE` |
-| 08 | 전체 회귀 테스트와 API 문서 | `TODO` |
+| 08 | 전체 회귀 테스트와 API 문서 | `DONE` |
 
 ## 현재 단계의 목표
 
@@ -35,8 +35,10 @@
 - `docs/blog-mvp/plans/PHASE-06-newsletter-delivery.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
 - Phase 07은 승인 범위 구현과 필수 검증을 완료해 `DONE`이다.
 - `docs/blog-mvp/plans/PHASE-07-internal-operations-security.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
+- Phase 08은 승인 범위 구현과 자동 검증을 완료해 `DONE`이다.
+- `docs/blog-mvp/plans/PHASE-08-final-verification-documentation.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
 - Phase 07은 댓글 조회·숨김·복원과 뉴스레터 테스트 발송·예약 취소·실패 재시도를 `/internal/**`로 노출하고 별도 우선순위 SecurityFilterChain의 API Key 인증으로 보호한다.
-- Current phase는 Phase 08이며 상태는 `TODO`다.
+- Current phase는 `COMPLETE`이며 전체 상태는 운영 수동 검증 대기 상태다.
 - Phase 06은 DB 직접 작성 BlogPost reconciliation, 15분 예약, Campaign/Delivery unique와 원자 claim, bounded 발송, SES v2, retry, kill switch 및 RFC 8058을 구현했다.
 - 조건부 승인은 claimExpiresAt, SecureRandom token, kill switch의 상태 무변경, 개별 AWS SDK 2.29.52, public/API base URL 분리, path token one-click과 test send allowlist를 확정했다.
 - Phase 06에서는 공개 one-click unsubscribe POST를 제외한 운영 Controller, `/internal/newsletter/**`, API Key 인증과 SecurityConfig 변경을 구현하지 않는다.
@@ -767,10 +769,10 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 
 ## 다음 작업
 
-1. Phase 07 구현 diff를 승인 범위와 대조하고 관련 테스트, 전체 clean build와 정적 검사를 수행한다.
-2. 실패가 하나라도 있으면 Phase 07을 `DONE`으로 변경하지 않고 원인과 상태를 append-only로 기록한다.
-3. 모든 검증 성공 시에만 계획 `EXECUTED`, Phase 07 `DONE`, Current phase Phase 08로 전환한다.
-4. Phase 08 전체 검수에서 실제 proxy 접근 제한, key rotation, Sentry/access log, Mongo 상태 전이와 실제 테스트 email을 검증한다.
+1. 운영 담당자가 SES identity, DKIM, sandbox, quota와 통제된 실제 이메일을 검증한다.
+2. 보안·관측 담당자가 실제 Sentry outbound event와 애플리케이션 로그의 개인정보 제거를 검증한다.
+3. 인프라 담당자가 ALB/proxy/CDN access log, Security Group·방화벽과 내부 API 접근 경계를 검증한다.
+4. 프론트 담당자가 실제 avatar manifest와 정적 파일 배포를 검증하고 CI 담당자가 GitHub Actions 성공 run 증적을 남긴다.
 
 ## Session Log
 
@@ -1323,3 +1325,67 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 외부 접근: 실제 MongoDB, Redis, SES, Sentry, ALB/reverse proxy, 운영 인프라와 실제 email은 호출하지 않음
 - Phase 08 이관: 실제 ALB/firewall/Security Group 접근 제한, single-key rotation 절차, Sentry outbound 및 server/proxy/CDN access log redaction, one-click path token 노출, 실제 Mongo 상태 전이, 실제 test email, 인증 실패 metric/rate limit을 검증함
 - 다음 단계: 사용자 코드 검토를 기다리며 Phase 08은 `TODO`로 유지하고 별도 승인 전 구현하지 않음
+
+### 2026-07-31 16:10:55 KST — Phase 08 계획 수립
+
+- 상태: Phase 08 `PLANNING`, 계획 `DRAFT`, Current phase Phase 08 유지
+- 선행 문서: `AGENTS.md`, `PLANS.md`, REQUIREMENTS, WORKFLOW, IMPLEMENTATION_STATUS와 Phase 01~07 실행 계획서를 지정 순서로 읽음
+- 선행 상태: Phase 01~07 모두 `DONE`, 각 계획서 모두 `EXECUTED`
+- 시작 브랜치와 작업 트리: `feat/blog-mvp`, `git status --short` 출력 없음
+- preflight: `scripts/codex-preflight.sh` `Preflight: PASS`
+- read-only 분석: blog/comment/newsletter/exams/global main, 전체 test, Gradle, main/test application 설정, compose, deploy workflow, Dockerfile/Dokerfile, `.env.example`과 Redis Lua를 확인함
+- 현재 검증 기반: Phase 07 Gradle XML의 421개 test가 failures/errors/skipped 0이나 실제 MongoDB/Redis server 통합 test와 Testcontainers dependency는 없음
+- 권고안: MongoDB 7.0과 Redis 7.2-alpine Testcontainers, 별도 `integrationTest` task와 CI gate를 사용하고 실제 운영 시스템에는 연결하지 않음
+- 정적 발견: `GlobalExceptionAdvice`의 stack trace/raw message, JWT 고정 fallback, Sentry PII true 및 고정 DSN을 Phase 08 최소 보안 수정 승인 대상으로 기록함
+- Docker 확인: client 29.6.1, Compose 5.2.0, compose config 성공; 현재 sandbox는 Docker socket 접근이 거절돼 image build는 미검증
+- 아바타 확인: backend에는 외부 base URL과 image key 검증만 있고 asset/IaC가 없어 실제 frontend/CloudFront/S3 방식을 운영자 결정 항목으로 남김
+- 변경 파일: Phase 08 DRAFT 계획서 생성과 이 상태 문서의 Phase 08 상태/append-only Session Log만 수정함
+- 미변경: Java, test, `build.gradle`, application 설정, CI, Dockerfile과 API·운영 문서 전체
+- 다음 단계: 사용자의 계획 및 결정 항목 명시적 승인을 기다리며 승인 전 구현, 통합 test, Docker build와 외부 접근을 수행하지 않음
+
+### 2026-07-31 16:22:52 KST — Phase 08 조건부 승인 및 구현 시작
+
+- 상태: Phase 08 `IN_PROGRESS`, 계획 `APPROVED`, Current phase Phase 08 유지
+- 승인 근거: 사용자가 수정된 Phase 08 계획을 조건부로 명시적 승인하고 Testcontainers, 통합 검증, 최소 보안 수정, CI gate, 문서화와 `Dokerfile` 조건부 삭제 범위를 확정함
+- 시작 브랜치: `feat/blog-mvp`
+- 시작 작업 트리: 직전 Codex가 만든 Phase 08 계획서와 이 상태 문서 변경만 존재함
+- preflight: branch는 통과했고 알려진 Phase 08 문서 두 개가 미커밋이어서 clean-tree 검사만 실패함
+- 선행 조건: Phase 01부터 Phase 07까지 모두 `DONE`, 각 계획서는 `EXECUTED`
+- 구현 원칙: 새로운 제품 기능이나 API 계약 변경 없이 실제 MongoDB·Redis·Scheduler 검증, 최소 보안 수정, CI 검증 gate와 운영 문서만 구현함
+- 외부 제한: 운영 MongoDB·Redis·AWS·Sentry·인프라에 접근하지 않고 실제 이메일, Docker push와 배포를 수행하지 않음
+
+### 2026-07-31 17:28:40 KST — Phase 08 구현 완료 및 검증 시작
+
+- 상태: Phase 08 `VERIFYING`, 계획 `APPROVED`, Current phase Phase 08 유지
+- Testcontainers: 별도 `src/integrationTest`와 `integrationTest` task, `mongo:7.0`, `redis:7.2-alpine`, CI unit → integration → bootJar gate를 구현함
+- Mongo 검증: blog/comment/Subscriber/Campaign/Delivery/Scheduler의 실제 index, unique, query, claim fencing, retry batch와 동시성 test source를 추가함
+- Redis 검증: comment와 newsletter Lua의 counter, TTL 비연장, partial mutation 금지, owner cleanup, 동시 제한과 연결 장애 fail-open test source를 추가함
+- 보안: JWT fallback 제거와 32바이트 fail-fast, generic exception 원문 제거, Sentry DSN 외부화·PII false와 전역 request/user/exception redaction을 구현함
+- API 계약: final public/internal/exams mapping, 금지 mapping 부재, RFC one-click consumes와 기존 SecurityFilterChain contract를 보강함
+- 문서: `API.md`, `OPERATIONS.md`, `DEPLOYMENT_CHECKLIST.md`, `SECURITY.md`, `TESTING.md`를 실제 DTO·enum·설정 기준으로 작성함
+- Dockerfile 정리: `rg -n 'Dokerfile' .` 및 CI/Compose/deploy 참조를 확인하고 Java 21 `Dockerfile`만 사용돼 승인 조건에 따라 Java 17 오탈자 `Dokerfile`을 삭제함
+- 예비 검증: `compileTestJava`, `integrationTestClasses`, 신규 JWT/예외/Sentry/API/config 선택 test와 `git diff --check` 성공
+- Docker 환경: 실제 integration 실행은 Testcontainers가 Docker environment를 찾지 못해 실패한 이력이 있으며 우회·skip하지 않고 필수 전체 검증에서 다시 확인함
+- 다음 단계: unit, integrationTest, bootJar, compose, Docker build와 최종 정적 검수를 실행하고 실패가 있으면 DONE/EXECUTED로 변경하지 않음
+
+### 2026-07-31 18:06:31 KST — Phase 08 검증 완료
+
+- 최종 상태: Phase 08 `DONE`, 계획 `EXECUTED`, Current phase `COMPLETE`, 전체 `IMPLEMENTATION_COMPLETE_PENDING_OPERATIONS`
+- unit/contract 검증: `bash ./gradlew clean test` `BUILD SUCCESSFUL`, 433개 failures/errors/skipped 0
+- 실제 통합 검증: `bash ./gradlew integrationTest` `BUILD SUCCESSFUL`, MongoDB 7.0과 Redis 7.2-alpine Testcontainers에서 32개 failures/errors/skipped 0
+- build graph 검증: `bash ./gradlew bootJar`와 `bash ./gradlew clean test integrationTest bootJar` 모두 성공, 약 60 MiB 실행 JAR 생성
+- Docker 검증: `docker compose -f compose.local.yml config`와 `docker build -t to-teacher-backend:phase08 .` 성공, image 내부 Temurin OpenJDK 21.0.11 확인
+- MongoDB 검증: blog/comment/Subscriber/Campaign/Delivery의 실제 index·unique·query·원자 상태 전이·claim fencing·retry batch와 동시성 검증 성공
+- Redis 검증: comment/newsletter Lua의 counter·TTL 비연장·부분 mutation 금지·duplicate owner cleanup·동시 제한과 장애 fail-open 계약 검증 성공
+- Scheduler 검증: explicit opt-in, 15분 예약, cursor batch 100, 중복 방지, kill switch 재개, stale 처리, 최대 4회 provider 호출과 Campaign 집계 검증 성공
+- 보안 검증: JWT 32바이트 fail-fast, raw exception 외부 비노출, Sentry PII false와 redaction, internal/public SecurityFilterChain 및 one-click token 계약 검증 성공
+- API 회귀: public/internal/exams 최종 mapping 유지, 댓글 삭제·수정, 게시글 쓰기, verify API와 NewsletterSubscriber PENDING 부재 확인
+- 문서: `API.md`, `OPERATIONS.md`, `DEPLOYMENT_CHECKLIST.md`, `SECURITY.md`, `TESTING.md`를 실제 구현·설정 기준으로 완성함
+- 정적 검수: `git diff --check` 성공, main source TODO/FIXME, `System.out`, `printStackTrace`, AWS key/private key, hardcoded JWT fallback, 구 package import와 sending 기본 true 없음
+- 결함 수정: Docker Engine 29와 Testcontainers 1.20.4 API 비호환을 1.21.4 최소 상향으로 해결하고, 고정 Clock의 동일 heartbeat update에서 claim을 잃은 것으로 오판하던 Campaign 생성 결함을 `matchedCount` fencing으로 수정함
+- 파일 정리: 저장소 전체 참조가 없는 Java 17 오탈자 `Dokerfile`을 승인 조건에 따라 삭제했고 Java 21 `Dockerfile`은 유지함
+- 실행 명령: 필수 문서 재독, branch/status, source·설정 정적 검색, Gradle unit/integration/bootJar 명령, Compose config, Docker build/run, test XML 집계와 최종 diff/status 확인을 수행함
+- 승인 계획 차이: Testcontainers 1.21.4 호환성 상향과 실제 MongoDB에서 발견한 Campaign heartbeat 판정 수정 외 제품 기능·API·상태·제외 범위 차이는 없음
+- 미실행 외부 작업: 운영 MongoDB·Redis·AWS·SES·Sentry·ALB·Security Group에 접근하지 않았고 실제 이메일, registry push와 배포를 수행하지 않음
+- 남은 운영 검증: SES identity/DKIM/sandbox/quota와 실제 Gmail one-click, Sentry outbound, ALB/proxy/CDN access log, 내부 API network boundary, frontend avatar manifest, API key rotation rehearsal와 실제 GitHub Actions 성공 증적
+- 완료 판단: 코드 Phase 완료 조건은 충족했지만 위 운영 수동 검증 전에는 운영 출시 승인 또는 배포 준비 완료로 간주하지 않음

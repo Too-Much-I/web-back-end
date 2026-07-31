@@ -107,7 +107,9 @@ class NewsletterCampaignQueryRepositoryImplTest {
                 any(Query.class),
                 any(Update.class),
                 eq(NewsletterCampaign.class)))
-                .thenReturn(UpdateResult.acknowledged(1, 1L, null));
+                .thenReturn(
+                        UpdateResult.acknowledged(1, 0L, null),
+                        UpdateResult.acknowledged(1, 1L, null));
 
         assertThat(repository.extendGenerationClaim(
                 "campaign-id", "current-token", EXPIRES_AT, NOW)).isTrue();

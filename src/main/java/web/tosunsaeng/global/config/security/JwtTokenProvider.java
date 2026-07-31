@@ -24,6 +24,8 @@ import java.util.Date;
 @Component
 public class JwtTokenProvider {
 
+    static final int MIN_SECRET_BYTES = 32;
+
     @Value("${jwt.secret}")
     private String secretKeyString;
 
@@ -34,8 +36,16 @@ public class JwtTokenProvider {
 
     @PostConstruct
     protected void init() {
-        // 평문 secret 키를 바이트 배열로 변환하여 HmacSha 키 생성
-        this.secretKey = Keys.hmacShaKeyFor(secretKeyString.getBytes(StandardCharsets.UTF_8));
+        byte[] secretBytes = secretKeyString == null
+                ? new byte[0]
+                : secretKeyString.getBytes(StandardCharsets.UTF_8);
+        if (secretKeyString == null
+                || secretKeyString.isBlank()
+                || secretBytes.length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException(
+                    "JWT_SECRET_KEY는 UTF-8 기준 32 byte 이상이어야 합니다.");
+        }
+        this.secretKey = Keys.hmacShaKeyFor(secretBytes);
     }
 
     // JWT 토큰 생성 (테스트용)
