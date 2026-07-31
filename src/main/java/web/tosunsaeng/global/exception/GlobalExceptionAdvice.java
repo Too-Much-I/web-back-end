@@ -108,26 +108,31 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler
     public ResponseEntity<Object> exception(Exception e, WebRequest request) {
-        e.printStackTrace();
-
         Sentry.captureException(e);
 
-        // 🌟 여기에 넣어두면 부모 클래스 메서드 상관없이 파싱 에러를 100% 낚아챕니다!
         if (e instanceof HttpMessageNotReadableException) {
-            log.error("🚨 [AI 콜백 에러] JSON 파싱 실패! AI 서버가 보낸 데이터 타입이 DTO와 맞지 않습니다.");
-            log.error("🚨 [파싱 에러 원인]: {}", e.getMessage());
-
-            String errorMessage = "요청 본문(JSON) 파싱 실패: " + e.getMessage();
-            return handleExceptionInternalMessage(e, HttpHeaders.EMPTY, request, errorMessage);
+            log.warn(
+                    "event=http.request.invalid_body exceptionType={}",
+                    e.getClass().getName());
+            return handleExceptionInternalFalse(
+                    e,
+                    ErrorStatus._BAD_REQUEST,
+                    HttpHeaders.EMPTY,
+                    ErrorStatus._BAD_REQUEST.getHttpStatus(),
+                    request,
+                    null);
         }
 
+        log.error(
+                "event=http.request.unhandled_exception exceptionType={}",
+                e.getClass().getName());
         return handleExceptionInternalFalse(
                 e,
                 ErrorStatus._INTERNAL_SERVER_ERROR,
                 HttpHeaders.EMPTY,
                 ErrorStatus._INTERNAL_SERVER_ERROR.getHttpStatus(),
                 request,
-                   e.getMessage());
+                null);
     }
 
     @ExceptionHandler(value = GeneralException.class)

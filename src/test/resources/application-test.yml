@@ -1,0 +1,63 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/tosunsaeng-test
+      database: tosunsaeng-test
+
+  cloud:
+    aws:
+      credentials:
+        access-key: test-access-key
+        secret-key: test-secret-key
+      s3:
+        bucket: test-bucket
+
+blog:
+  anonymous:
+    token-secret: test-only-anonymous-token-secret-at-least-32-bytes
+    cookie-secure: false
+    cookie-max-age-days: 180
+  anonymous-profile:
+    avatar-base-url: https://cdn.example.test
+    avatar-options:
+      - noun: 수달
+        image-key: character-image/example-otter-v1.webp
+      - noun: 펭귄
+        image-key: character-image/example-penguin-v1.webp
+  comment:
+    abuse:
+      secret: test-only-comment-rate-limit-secret-at-least-32-bytes
+      enabled: false
+
+newsletter:
+  unsubscribe-token:
+    secret: test-only-newsletter-unsubscribe-active-secret-at-least-32-bytes
+    key-id: active-v1
+    previous-keys:
+      previous-v0: test-only-newsletter-unsubscribe-previous-secret-at-least-32-bytes
+  subscribe-rate-limit:
+    secret: test-only-newsletter-subscribe-rate-secret-at-least-32-bytes
+    enabled: false
+  delivery:
+    sending-enabled: false
+    email-provider: logging
+    from-email: newsletter@example.test
+    from-name: 토선생
+    public-base-url: https://www.example.test
+    api-base-url: https://api.example.test
+    test-sending-enabled: false
+    test-recipient-allowlist:
+      - allowed@example.test
+
+internal:
+  api:
+    enabled: false
+    key: ""
+
+jwt:
+  secret: test-only-jwt-secret-at-least-32-bytes
+
+sentry:
+  dsn: ""
+  enabled: false
+  send-default-pii: false

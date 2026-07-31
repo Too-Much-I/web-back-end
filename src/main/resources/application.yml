@@ -22,8 +22,55 @@ spring:
       max-file-size: 10MB      # 파일 하나당 최대 크기 (필요 시 20MB 등으로 늘리세요)
       max-request-size: 10MB   # 요청 하나당 최대 크기
 
+blog:
+  anonymous:
+    token-secret: ${BLOG_ANONYMOUS_TOKEN_SECRET:}
+    cookie-secure: ${BLOG_ANONYMOUS_COOKIE_SECURE:true}
+    cookie-max-age-days: ${BLOG_ANONYMOUS_COOKIE_MAX_AGE_DAYS:180}
+  anonymous-profile:
+    avatar-base-url: ${BLOG_ANONYMOUS_AVATAR_BASE_URL:}
+  comment:
+    abuse:
+      secret: ${BLOG_COMMENT_RATE_LIMIT_SECRET:}
+      enabled: ${BLOG_COMMENT_RATE_LIMIT_ENABLED:true}
+      duplicate-ttl-seconds: ${BLOG_COMMENT_DUPLICATE_TTL_SECONDS:600}
+
+newsletter:
+  unsubscribe-token:
+    secret: ${NEWSLETTER_UNSUBSCRIBE_TOKEN_SECRET:}
+    key-id: ${NEWSLETTER_UNSUBSCRIBE_TOKEN_KEY_ID:}
+  subscribe-rate-limit:
+    secret: ${NEWSLETTER_SUBSCRIBE_RATE_LIMIT_SECRET:}
+    enabled: ${NEWSLETTER_SUBSCRIBE_RATE_LIMIT_ENABLED:true}
+  delivery:
+    sending-enabled: ${NEWSLETTER_SENDING_ENABLED:false}
+    email-provider: ${NEWSLETTER_EMAIL_PROVIDER:logging}
+    from-email: ${NEWSLETTER_FROM_EMAIL:}
+    from-name: ${NEWSLETTER_FROM_NAME:토선생}
+    public-base-url: ${NEWSLETTER_PUBLIC_BASE_URL:}
+    api-base-url: ${NEWSLETTER_API_BASE_URL:}
+    send-delay-minutes: ${NEWSLETTER_SEND_DELAY_MINUTES:15}
+    batch-size: ${NEWSLETTER_BATCH_SIZE:100}
+    worker-count: ${NEWSLETTER_WORKER_COUNT:2}
+    queue-capacity: ${NEWSLETTER_QUEUE_CAPACITY:100}
+    claim-ttl-seconds: ${NEWSLETTER_CLAIM_TTL_SECONDS:300}
+    reconciliation-delay-ms: ${NEWSLETTER_RECONCILIATION_DELAY_MS:60000}
+    campaign-delay-ms: ${NEWSLETTER_CAMPAIGN_DELAY_MS:10000}
+    delivery-delay-ms: ${NEWSLETTER_DELIVERY_DELAY_MS:5000}
+    retry-delay-ms: ${NEWSLETTER_RETRY_DELAY_MS:30000}
+    completion-delay-ms: ${NEWSLETTER_COMPLETION_DELAY_MS:30000}
+    stale-recovery-delay-ms: ${NEWSLETTER_STALE_RECOVERY_DELAY_MS:60000}
+    test-sending-enabled: ${NEWSLETTER_TEST_SENDING_ENABLED:false}
+    test-recipient-allowlist: ${NEWSLETTER_TEST_RECIPIENT_ALLOWLIST:}
+    aws-region: ${AWS_REGION:ap-northeast-2}
+
+internal:
+  api:
+    enabled: ${INTERNAL_API_ENABLED:false}
+    key: ${INTERNAL_API_KEY:}
+
 jwt:
-  secret: ${JWT_SECRET_KEY:ThisIsATemporarySecretKeyForTosunsaengProject2026!@#}
+  secret: ${JWT_SECRET_KEY:}
 
 springdoc:
   swagger-ui:
@@ -41,8 +88,8 @@ server:
     max-connections: 100 # 동시에 허용할 최대 커넥션 수
 
 sentry:
-  dsn: https://b3d789637d5044a200ef914f12499938@o4511776045400064.ingest.us.sentry.io/4511776050839552
-  send-default-pii: true
+  dsn: ${SENTRY_DSN:}
+  send-default-pii: false
 
   # 에러 로그 중 ERROR 레벨 이상만 Sentry 이벤트로 발송
   logging:

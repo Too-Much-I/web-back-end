@@ -1,0 +1,197 @@
+# Git staging changes the future commit set. Codex must leave that decision to the user.
+prefix_rule(
+    pattern = ["git", "add"],
+    decision = "forbidden",
+    justification = "Codex는 변경을 staging하지 않습니다. `git status --short`와 `git diff`로 변경을 확인한 뒤 사용자가 직접 선택하세요.",
+    match = ["git add .", "git add AGENTS.md"],
+    not_match = ["git status --short", "git diff -- AGENTS.md"],
+)
+
+# Commits create durable history and require the user's authorship decision.
+prefix_rule(
+    pattern = ["git", "commit"],
+    decision = "forbidden",
+    justification = "Codex는 commit을 만들지 않습니다. 변경과 검증 결과를 보고받은 뒤 사용자가 직접 commit하세요.",
+    match = ["git commit -m phase-00", "git commit --amend"],
+    not_match = ["git log -5 --oneline"],
+)
+
+# Pushing affects a remote repository.
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "forbidden",
+    justification = "원격 저장소 변경은 금지됩니다. `git status`와 로컬 diff를 검토한 뒤 사용자가 직접 push하세요.",
+    match = ["git push", "git push origin feat/blog-mvp"],
+    not_match = ["git remote -v"],
+)
+
+# Merges can rewrite the working tree and combine unapproved work.
+prefix_rule(
+    pattern = ["git", "merge"],
+    decision = "forbidden",
+    justification = "Codex는 브랜치를 merge하지 않습니다. `git log --graph --oneline`으로 이력을 확인하고 사용자가 직접 통합하세요.",
+    match = ["git merge main", "git merge --no-ff feat/blog-mvp"],
+    not_match = ["git log --graph --oneline"],
+)
+
+# Rebases rewrite commit history.
+prefix_rule(
+    pattern = ["git", "rebase"],
+    decision = "forbidden",
+    justification = "Codex는 이력을 rebase하지 않습니다. 필요한 기준 브랜치와 충돌 가능성을 보고한 뒤 사용자가 직접 수행하세요.",
+    match = ["git rebase main", "git rebase --continue"],
+    not_match = ["git merge-base main HEAD"],
+)
+
+# Reset can discard index, working-tree, or history state.
+prefix_rule(
+    pattern = ["git", "reset"],
+    decision = "forbidden",
+    justification = "기존 변경 손실을 막기 위해 reset은 금지됩니다. `git status --short`와 `git diff`로 상태만 확인하고 사용자에게 보고하세요.",
+    match = ["git reset --hard HEAD", "git reset AGENTS.md"],
+    not_match = ["git status --short"],
+)
+
+# Clean deletes untracked files.
+prefix_rule(
+    pattern = ["git", "clean"],
+    decision = "forbidden",
+    justification = "추적되지 않은 사용자 파일 삭제를 막기 위해 clean은 금지됩니다. `git clean -nd`도 Codex가 실행하지 말고 `git status --short`로 목록을 보고하세요.",
+    match = ["git clean -fd", "git clean -fdx"],
+    not_match = ["git status --short"],
+)
+
+# Restore can overwrite user changes.
+prefix_rule(
+    pattern = ["git", "restore"],
+    decision = "forbidden",
+    justification = "사용자 변경 덮어쓰기를 막기 위해 restore는 금지됩니다. 대상 diff를 확인하고 필요한 역변경을 사용자에게 설명하세요.",
+    match = ["git restore build.gradle", "git restore --staged AGENTS.md"],
+    not_match = ["git diff -- build.gradle"],
+)
+
+# Checkout can change branches or overwrite files.
+prefix_rule(
+    pattern = ["git", "checkout"],
+    decision = "forbidden",
+    justification = "브랜치 변경과 파일 복구는 사용자가 결정해야 합니다. `git branch --show-current`로 현재 브랜치만 확인하고 필요한 변경을 보고하세요.",
+    match = ["git checkout main", "git checkout -- build.gradle"],
+    not_match = ["git branch --show-current"],
+)
+
+# Switch changes branches and can carry working-tree changes across branches.
+prefix_rule(
+    pattern = ["git", "switch"],
+    decision = "forbidden",
+    justification = "Codex는 브랜치를 변경하지 않습니다. 현재 브랜치와 필요한 목표 브랜치를 사용자에게 보고하세요.",
+    match = ["git switch feat/blog-mvp", "git switch -c feat/blog-mvp"],
+    not_match = ["git branch --show-current"],
+)
+
+# Stash hides and rewrites the visible working-tree state.
+prefix_rule(
+    pattern = ["git", "stash"],
+    decision = "forbidden",
+    justification = "사용자 변경을 숨기거나 이동하지 않도록 stash는 금지됩니다. `git status --short`와 `git diff`로 변경을 그대로 보고하세요.",
+    match = ["git stash", "git stash pop"],
+    not_match = ["git status --short"],
+)
+
+# The GitHub CLI can mutate remote repositories, PRs, releases, and workflows.
+prefix_rule(
+    pattern = ["gh"],
+    decision = "forbidden",
+    justification = "Codex의 GitHub 원격 작업은 금지됩니다. 필요한 PR 또는 원격 작업 내용을 작성해 사용자가 직접 수행하게 하세요.",
+    match = ["gh pr create", "gh pr merge 42", "gh workflow run deploy.yml"],
+    not_match = ["git status --short"],
+)
+
+# SSH can reach production or other remote hosts.
+prefix_rule(
+    pattern = ["ssh"],
+    decision = "forbidden",
+    justification = "운영 서버를 포함한 원격 호스트 접근은 금지됩니다. 로컬 설정과 로그만 확인하고 필요한 원격 점검을 사용자에게 요청하세요.",
+    match = ["ssh ubuntu@example.com", "ssh -i key.pem host"],
+    not_match = ["ssh-keygen -lf key.pub"],
+)
+
+# SCP transfers files to or from remote hosts.
+prefix_rule(
+    pattern = ["scp"],
+    decision = "forbidden",
+    justification = "원격 파일 전송은 금지됩니다. 로컬 산출물 경로와 사용자가 직접 전송할 절차만 보고하세요.",
+    match = ["scp app.jar host:/tmp/app.jar", "scp host:/tmp/log.txt ."],
+    not_match = ["ls -l app.jar"],
+)
+
+# AWS CLI can read or mutate production cloud resources.
+prefix_rule(
+    pattern = ["aws"],
+    decision = "forbidden",
+    justification = "AWS 계정과 운영 리소스 접근은 금지됩니다. 로컬 구성만 검토하고 필요한 콘솔 또는 CLI 작업을 사용자에게 요청하세요.",
+    match = ["aws s3 ls", "aws ec2 describe-instances"],
+    not_match = ["rg aws .github/workflows"],
+)
+
+# Image pushes publish artifacts to a registry.
+prefix_rule(
+    pattern = ["docker", "push"],
+    decision = "forbidden",
+    justification = "Docker registry 게시를 금지합니다. 로컬 이미지 목록이나 빌드 결과만 보고하고 사용자가 직접 push하세요.",
+    match = ["docker push example/blog:latest"],
+    not_match = ["docker image ls"],
+)
+
+# Registry login handles external credentials.
+prefix_rule(
+    pattern = ["docker", "login"],
+    decision = "forbidden",
+    justification = "Registry 자격 증명 사용을 금지합니다. 필요한 registry와 이미지 태그만 사용자에게 안내하세요.",
+    match = ["docker login", "docker login registry.example.com"],
+    not_match = ["docker version"],
+)
+
+# System prune can delete unrelated local Docker assets.
+prefix_rule(
+    pattern = ["docker", "system", "prune"],
+    decision = "forbidden",
+    justification = "관련 없는 Docker 자산 삭제를 막기 위해 system prune은 금지됩니다. `docker system df`로 사용량만 확인하세요.",
+    match = ["docker system prune", "docker system prune -af"],
+    not_match = ["docker system df"],
+)
+
+# Volume prune can irreversibly delete local database data.
+prefix_rule(
+    pattern = ["docker", "volume", "prune"],
+    decision = "forbidden",
+    justification = "로컬 DB를 포함한 volume 데이터 손실을 막기 위해 volume prune은 금지됩니다. `docker volume ls`로 목록만 확인하세요.",
+    match = ["docker volume prune", "docker volume prune -f"],
+    not_match = ["docker volume ls"],
+)
+
+# Recursive forced removal can destroy broad paths without recovery.
+prefix_rule(
+    pattern = ["rm", ["-rf", "-fr"]],
+    decision = "forbidden",
+    justification = "재귀적 강제 삭제는 금지됩니다. `find` 또는 `ls`로 대상을 확인하고 안전한 수동 변경 계획을 사용자에게 보고하세요.",
+    match = ["rm -rf build/tmp", "rm -fr generated"],
+    not_match = ["rm -f single.tmp", "rmdir empty-directory"],
+)
+
+# Split recursive/force flags are equivalent to rm -rf.
+prefix_rule(
+    pattern = ["rm", ["-r", "--recursive"], ["-f", "--force"]],
+    decision = "forbidden",
+    justification = "분리된 옵션을 사용한 재귀적 강제 삭제도 금지됩니다. 삭제하지 말고 대상 목록과 필요한 정리 방법을 보고하세요.",
+    match = ["rm -r -f build/tmp", "rm --recursive --force generated"],
+    not_match = ["rm -r empty-directory", "rm -f single.tmp"],
+)
+
+# Direct Mongo shell access requires the user to confirm the environment and target.
+prefix_rule(
+    pattern = ["mongosh"],
+    decision = "prompt",
+    justification = "MongoDB 접속 전 로컬/테스트 환경인지, URI에 비밀값이 없는지, 운영 DB가 아닌지 사용자가 확인해야 합니다. 가능하면 애플리케이션 테스트나 로컬 fixture를 사용하세요.",
+    match = ["mongosh", "mongosh mongodb://localhost:27017/blog"],
+    not_match = ["mongod --version", "rg mongodb build.gradle"],
+)
