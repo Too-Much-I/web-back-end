@@ -3,7 +3,7 @@
 - 전체 상태: `IN_PROGRESS`
 - 현재 단계: `Phase 05 — 뉴스레터 구독과 구독 해지`
 - 현재 브랜치: `feat/blog-mvp`
-- 마지막 수정 시각: `2026-07-30 16:50:52 KST (+09:00)`
+- 마지막 수정 시각: `2026-07-30 17:53:16 KST (+09:00)`
 
 ## 단계별 상태
 
@@ -14,7 +14,7 @@
 | 02 | 게시글 목록·상세·제목 검색 | `DONE` |
 | 03 | 익명 댓글과 번호 기반 validation | `DONE` |
 | 04 | 댓글 rate limit과 숨김·복원 | `DONE` |
-| 05 | 뉴스레터 구독과 구독 해지 | `TODO` |
+| 05 | 뉴스레터 구독과 구독 해지 | `PLANNING` |
 | 06 | 뉴스레터 15분 자동 발송 | `TODO` |
 | 07 | 내부 운영 API와 보안 | `TODO` |
 | 08 | 전체 회귀 테스트와 API 문서 | `TODO` |
@@ -29,13 +29,28 @@
 - `docs/blog-mvp/plans/PHASE-03-anonymous-comments.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
 - Phase 04는 승인 범위 구현, 댓글 관련 152개 테스트, 전체 215개 테스트와 bootJar 검증을 완료해 `DONE`이다.
 - `docs/blog-mvp/plans/PHASE-04-comment-abuse-moderation.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
-- Current phase는 Phase 05이며 상태는 `TODO`다.
+- Current phase는 Phase 05이며 상태는 `PLANNING`이다.
+- `docs/blog-mvp/plans/PHASE-05-newsletter-subscription.md`는 구현 전 사용자 승인을 기다리는 `DRAFT`다.
+- Phase 05 계획은 즉시 ACTIVE 구독, 정규화 email unique, 조건부 재구독, stateless HMAC 해지 token과 newsletter 전용 IP rate limit을 권고한다.
+- 이번 계획 수립에서는 Java, test, Gradle, application 설정과 API를 수정하지 않는다.
 - 저장소에는 Redis Cluster·Sentinel·다중 primary 설정이 없고 단일 `REDIS_HOST`/`REDIS_PORT`만 있어 Phase 04는 standalone/single-primary를 전제로 한다.
 - 여러 visitor/IP/duplicate key를 한 Lua에서 처리하므로 Redis Cluster 전환 시 `CROSSSLOT`을 피하도록 key와 원자성 전략을 재설계해야 한다.
 - client IP는 `request.getRemoteAddr()`만 사용하고 임의 `X-Forwarded-For`는 신뢰하지 않는다.
 - duplicate reservation은 Mongo save 전에 owner token으로 만들고 Mongo 실패 시 owner 일치 Lua로만 해제하며 rate counter는 rollback하지 않는다.
 
 ## 변경 파일
+
+Phase 05 계획 수립에서 변경한 파일:
+
+- `docs/blog-mvp/plans/PHASE-05-newsletter-subscription.md`
+- `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+
+Phase 05 계획 수립에서 수정하지 않는 파일:
+
+- Java 소스와 기존 테스트 전체
+- `build.gradle`, main/test application 설정과 `.env.example`
+- BaseResponse, GlobalExceptionAdvice, SecurityConfig와 기존 RedisConfig
+- 기존 게시글·댓글·exams 비즈니스 로직
 
 Phase 04 계획 수립에서 변경한 파일:
 
@@ -572,10 +587,10 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 
 ## 다음 작업
 
-1. 승인된 Phase 04 범위의 Redis abuse guard, 허니팟, 운영 조회와 숨김·복원을 구현한다.
-2. 구현 후 Phase 04를 `VERIFYING`으로 바꾸고 관련 테스트, 전체 build와 정적 검증을 수행한다.
-3. 모든 검증 성공 시에만 Phase 04를 `DONE`, 계획을 `EXECUTED`, Current phase를 Phase 05로 변경한다.
-4. Phase 08 전체 검수에서 실제 Redis Lua·TTL·동시성·topology, MongoDB index/query와 비공개 S3/CloudFront OAC 연동 테스트 인프라를 결정한다.
+1. 사용자가 Phase 05 DRAFT의 BOUNCED 응답, token rotation key ring, 별도 rate limit secret과 GET 해지 위험을 검토하고 명시적으로 승인한다.
+2. 승인 전에는 Phase 05를 `IN_PROGRESS`로 변경하거나 Java, test, Gradle, application 설정과 API를 수정하지 않는다.
+3. 승인 후 예상 파일 범위 안에서 newsletter 구독·해지와 IP rate limit을 구현하고 관련 테스트와 전체 build를 수행한다.
+4. Phase 08 전체 검수에서 실제 Mongo unique/upsert, Redis Lua·TTL·동시성·topology, Sentry/web server query redaction과 email client scanner 동작을 검증한다.
 
 ## Session Log
 
@@ -883,3 +898,44 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 승인 계획 차이: 외부 기능 차이는 없고 lazy IP Supplier와 최소 환경변수 노출은 승인 처리 순서·설정 범위 안의 구현 세부사항임
 - Phase 08 이관: 실제 Redis Lua syntax·TTL·동시성, standalone topology 장애, Cluster 전환 재설계, 실제 Mongo index/query와 신뢰 proxy client IP 검증
 - 다음 단계: 사용자 검토와 커밋 전 Phase 05 계획 또는 구현을 시작하지 않음
+
+### 2026-07-30 17:43:47 KST — Phase 05 DRAFT 계획서 작성
+
+- 상태: Phase 05 `PLANNING`, 계획 `DRAFT`, Current phase Phase 05 유지
+- 시작 브랜치: `feat/blog-mvp`
+- 시작 작업 트리: clean
+- 사전 점검: `scripts/codex-preflight.sh` 성공
+- 선행 조건: Phase 04 `DONE`, Phase 04 계획 `EXECUTED`
+- 분석 범위: blog·comment·exams, 공통 BaseResponse/status/exception/config, Redis/Lua/index/test 패턴, main/test application 설정과 Sentry query 노출 위험
+- 주요 권고: normalize-first Jakarta email validation, email unique + 조건부 findAndModify/duplicate 재조회, stateless HMAC token과 subscriber tokenVersion
+- token 권고: payload에 formatVersion·keyId·subscriberId·subscriberTokenVersion·issuedAt만 포함하고 active + previous verification key ring으로 rotation 준비
+- rate limit 권고: 별도 newsletter HMAC secret, getRemoteAddr, 10회/600초와 30회/86400초의 원자적 2-key Lua, connection/timeout만 fail-open
+- 개인정보 권고: email/token 원문 응답·로그 금지, unsubscribe query를 Sentry event/transaction에서 제거하고 실제 access log 검증은 Phase 08로 이관
+- 변경 파일: Phase 05 계획서와 이 상태 문서만 변경
+- 미변경 범위: Java, test, Gradle, application/env 설정, API, Mongo Document, SecurityConfig, GlobalExceptionAdvice와 기존 blog/comment/exams
+- 다음 단계: 계획 생성 후 필수 문서 재독과 정적 검증을 완료하고 사용자 명시적 승인을 기다림
+
+### 2026-07-30 17:53:16 KST — Phase 05 계획 수립 검증
+
+- 필수 문서: 계획서 생성 전 지정 문서와 Phase 04 계획서를 읽고, 생성 후 `AGENTS.md`, `REQUIREMENTS.md`, `WORKFLOW.md`, 이 상태 문서, `PLANS.md`, Phase 05 계획서를 규정 순서와 EOF까지 다시 읽음
+- 시작 명령: `git branch --show-current`, `git status --short`, `scripts/codex-preflight.sh`를 실행했고 branch, clean tree와 PASS를 확인함
+- 코드 분석: `rg --files`, `rg -n`, `sed -n`으로 blog/comment/exams, 공통 응답·status·exception/config, Redis/Lua/index/test와 main/test 설정을 읽기 전용으로 확인함
+- 문서 작성: `apply_patch`로 Phase 05 DRAFT 계획서를 생성하고 Phase 05만 `PLANNING`으로 변경했으며 Session Log는 append-only로 추가함
+- 계획 검증: `PLANS.md`와 사용자 필수 heading, 테스트 1~74의 연속성, DRAFT·PLANNING과 Current phase 05를 확인함
+- 범위 검증: `git status --short --untracked-files=all` 결과는 Phase 05 계획서와 상태 문서 두 개뿐이며 Java, test, Gradle, application/env 설정 변경 없음
+- 정적 검증: 두 변경 문서의 trailing whitespace 없음, `git diff --check` 성공
+- 계획 전용 작업이므로 Gradle test/build, 실제 MongoDB·Redis·Sentry와 이메일 발송은 실행하지 않음
+- 결과: 계획 `DRAFT`, Phase 05 `PLANNING`, Current phase 05를 유지하고 사용자 명시적 승인을 기다림
+
+### 2026-07-31 09:46:17 KST — Phase 05 unsubscribe API 계획 보정
+
+- 상태 유지: Phase 05 `PLANNING`, 계획 `DRAFT`, Current phase Phase 05 유지
+- 사용자 보정: backend 해지 계약을 query token GET에서 JSON body `POST /api/newsletter/unsubscribe`로 변경함
+- GET 정책: `GET /api/newsletter/unsubscribe` mapping을 제공하지 않고 GET 요청은 Newsletter Service·Repository를 호출하거나 Subscriber 상태를 변경하지 않음
+- frontend 흐름: Phase 06 email link는 frontend 확인 page를 가리키고, 사용자가 확인한 뒤 frontend가 backend POST를 호출하도록 계획함; frontend 화면은 Phase 05 제외 범위
+- token 정책: backend query parameter fallback 없이 POST body로만 받고 응답·일반 log·예외·Sentry request data·Subscriber Document에 원문 또는 hash를 노출·저장하지 않음
+- rate limit 보정: 역직렬화 가능한 모든 subscribe 요청을 email·consent validation보다 먼저 IP rate limit에 집계하는 기존 확정 결정을 계획 전체에 반영함
+- 테스트 보강: GET mapping 부재와 상태 불변, POST body token만 허용, query-only POST 거절, token 응답·log 미노출 MockMvc·보안 테스트 75~79를 추가함
+- Phase 08 이관: frontend URL query의 browser history, Referer, frontend hosting/CDN access log와 email scanner 동작 검증
+- 변경 범위: Phase 05 DRAFT 계획서 보정과 이 append-only Session Log 추가만 수행하고 Java, test, Gradle, application/env 설정은 수정하지 않음
+- 다음 단계: 보정된 Phase 05 DRAFT 전체에 대한 사용자 명시적 승인 전 구현 금지
