@@ -1,6 +1,15 @@
 # Phase 05: 뉴스레터 구독 및 구독 해지
 
-- 상태: DRAFT
+- 상태: EXECUTED
+
+## 승인 후 패키지 구조 보정
+
+- 사용자의 추가 승인에 따라 댓글의 정식 package를 `web.tosunsaeng.domain.comment`, Phase 05 뉴스레터의 정식 package를 `web.tosunsaeng.domain.newsletter`로 통일한다.
+- main과 test의 물리 경로도 각각 `src/{main,test}/java/web/tosunsaeng/domain/comment/**`, `src/{main,test}/java/web/tosunsaeng/domain/newsletter/**`와 일치시킨다.
+- 기존 `web.tosunsaeng.domain.blog.comment`와 계획 당시의 `web.tosunsaeng.domain.blog.newsletter` package를 호환용으로 중복 유지하지 않는다.
+- 댓글 변경은 package 선언, import와 경로 이동만 허용하며 Phase 03·04의 API, validation, rate limit, moderation 동작은 변경하지 않는다.
+- 단순한 `final` 의존성 주입 생성자는 Lombok `@RequiredArgsConstructor`를 사용한다. 검증, 값 변환 또는 도메인 불변식 처리가 있는 생성자는 명시적 생성자를 유지한다.
+- 변경된 뉴스레터 테스트 선택자는 `web.tosunsaeng.domain.newsletter.*`이며 기존 `.domain.blog.newsletter.*` 선택자는 더 이상 사용하지 않는다.
 
 ## 목표
 
@@ -19,7 +28,7 @@ Phase 06에서 실제 이메일을 만들 때 원본 token을 DB에 저장하지
 - `docs/blog-mvp/plans/PHASE-04-comment-abuse-moderation.md`의 상태는 `EXECUTED`다.
 - Current phase는 Phase 05이고 계획 수립 전 상태는 `TODO`다.
 - 이 계획 수립에서는 이 계획서와 `docs/blog-mvp/IMPLEMENTATION_STATUS.md`만 변경한다.
-- 이 계획은 `DRAFT`이며 사용자가 명시적으로 승인하기 전에는 Java, test, Gradle, application 설정과 API를 수정하지 않는다.
+- 이 계획은 사용자 승인으로 `APPROVED`이며 승인된 범위와 이후 승인된 package 구조 보정만 구현한다.
 
 ## 현재 코드 분석
 
@@ -27,7 +36,7 @@ Phase 06에서 실제 이메일을 만들 때 원본 token을 DB에 저장하지
 
 - `src/main/java/web/tosunsaeng/domain/blog/**`에는 게시글과 댓글 package만 있고 Newsletter Controller, Service, Document, Repository, Sender와 Scheduler는 없다.
 - 공개 newsletter mapping, verify mapping, `NewsletterSubscriber`, `NewsletterDelivery`, 이메일 발송 client와 `@Scheduled` newsletter 작업도 없다.
-- Phase 05는 기존 package와 결합하지 않는 `web.tosunsaeng.domain.blog.newsletter` 하위 package로 추가할 수 있다.
+- Phase 05는 기존 package와 결합하지 않는 `web.tosunsaeng.domain.newsletter` 하위 package로 추가할 수 있다.
 - `TosunsaengApplication`의 Mongo Repository scan 범위는 `web.tosunsaeng.domain` 전체이므로 새 newsletter Repository를 위해 scan 설정을 수정할 필요가 없다.
 - UTC `Clock` Bean이 이미 있어 consent, subscribe, unsubscribe, create, update 시각에 재사용할 수 있다. `Instant.now()`를 직접 호출하지 않는다.
 
@@ -98,6 +107,8 @@ Phase 06에서 실제 이메일을 만들 때 원본 token을 DB에 저장하지
 9. Redis 연결·timeout만 fail-open하고 script·decode·key 생성 오류는 숨기지 않는다.
 10. email unique와 status Mongo index를 programmatic initializer로 추가한다.
 11. 관련 unit, mock Repository, Lua 계약, MockMvc와 범위 부정 테스트를 추가한다.
+12. 댓글 main/test package를 `web.tosunsaeng.domain.comment`로 이동하고 뉴스레터 main/test package를 `web.tosunsaeng.domain.newsletter`로 통일하되 기존 댓글 동작은 변경하지 않는다.
+13. 단순 `final` 의존성 주입 생성자에는 `@RequiredArgsConstructor`를 적용한다.
 
 ## 제외 범위
 
@@ -124,7 +135,7 @@ Phase 06에서 실제 이메일을 만들 때 원본 token을 DB에 저장하지
 - embedded Redis, Testcontainers와 새 test dependency
 - Redis Cluster 지원
 - 실제 web server, CloudFront·ALB access log 설정 변경
-- 관련 없는 blog, comment, exams 리팩터링
+- 승인된 comment/newsletter package 이동과 단순 생성자 주입 annotation 적용을 제외한 관련 없는 blog, comment, exams 리팩터링
 
 ## 예상 변경 파일
 
@@ -139,36 +150,36 @@ Phase 06에서 실제 이메일을 만들 때 원본 token을 DB에 저장하지
 
 승인 후 예상 생성 main 파일:
 
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/api/NewsletterRestController.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/api/support/NewsletterClientIpResolver.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/application/NewsletterService.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/application/NewsletterServiceImpl.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/application/NewsletterRateLimitService.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/application/NewsletterRateLimitServiceImpl.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/config/NewsletterConfig.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/config/NewsletterRateLimitProperties.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/config/NewsletterUnsubscribeTokenProperties.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/config/NewsletterMongoIndexInitializer.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/config/NewsletterTelemetryPrivacyConfig.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/converter/NewsletterConverter.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/entity/NewsletterSubscriber.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/enums/NewsletterSubscriberStatus.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/enums/NewsletterRateLimitScope.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/policy/NewsletterEmailNormalizer.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/policy/NewsletterRateLimitHasher.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/policy/NewsletterRateLimitKeyFactory.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/policy/NewsletterRedisFailureClassifier.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/policy/NewsletterUnsubscribeTokenManager.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/repository/NewsletterSubscriberRepository.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/repository/NewsletterSubscriberQueryRepository.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/repository/NewsletterSubscriberQueryRepositoryImpl.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/repository/NewsletterRateLimitRepository.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/domain/repository/RedisNewsletterRateLimitRepository.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/dto/NewsletterRequestDTO.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/dto/NewsletterResponseDTO.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/exception/NewsletterException.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/exception/NewsletterRateLimitException.java`
-- `src/main/java/web/tosunsaeng/domain/blog/newsletter/exception/NewsletterExceptionAdvice.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/api/NewsletterRestController.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/api/support/NewsletterClientIpResolver.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/application/NewsletterService.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/application/NewsletterServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/application/NewsletterRateLimitService.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/application/NewsletterRateLimitServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/config/NewsletterConfig.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/config/NewsletterRateLimitProperties.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/config/NewsletterUnsubscribeTokenProperties.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/config/NewsletterMongoIndexInitializer.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/config/NewsletterTelemetryPrivacyConfig.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/converter/NewsletterConverter.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/entity/NewsletterSubscriber.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/enums/NewsletterSubscriberStatus.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/enums/NewsletterRateLimitScope.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterEmailNormalizer.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterRateLimitHasher.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterRateLimitKeyFactory.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterRedisFailureClassifier.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterUnsubscribeTokenManager.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterSubscriberRepository.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterSubscriberQueryRepository.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterSubscriberQueryRepositoryImpl.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterRateLimitRepository.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/RedisNewsletterRateLimitRepository.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/dto/NewsletterRequestDTO.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/dto/NewsletterResponseDTO.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/exception/NewsletterException.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/exception/NewsletterRateLimitException.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/exception/NewsletterExceptionAdvice.java`
 - `src/main/resources/redis/newsletter-subscribe-rate-limit.lua`
 
 승인 후 예상 수정 main·설정·문서 파일:
@@ -181,23 +192,29 @@ Phase 06에서 실제 이메일을 만들 때 원본 token을 DB에 저장하지
 - `docs/blog-mvp/plans/PHASE-05-newsletter-subscription.md`
 - `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
 
+추가 승인에 따른 package 이동 파일:
+
+- `src/main/java/web/tosunsaeng/domain/blog/comment/**` → `src/main/java/web/tosunsaeng/domain/comment/**`
+- `src/test/java/web/tosunsaeng/domain/blog/comment/**` → `src/test/java/web/tosunsaeng/domain/comment/**`
+- newsletter main/test는 `src/{main,test}/java/web/tosunsaeng/domain/newsletter/**`만 유지하고 `.domain.blog.newsletter` 중복 package를 두지 않음
+
 승인 후 예상 생성 test 파일:
 
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/api/NewsletterRestControllerTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/api/support/NewsletterClientIpResolverTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/application/NewsletterServiceImplTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/application/NewsletterRateLimitServiceImplTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/config/NewsletterMongoIndexInitializerTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/config/NewsletterPropertiesTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/config/NewsletterTelemetryPrivacyConfigTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/domain/entity/NewsletterSubscriberStateTransitionTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/domain/policy/NewsletterEmailNormalizerTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/domain/policy/NewsletterRateLimitHasherTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/domain/policy/NewsletterRateLimitKeyFactoryTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/domain/policy/NewsletterRedisFailureClassifierTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/domain/policy/NewsletterUnsubscribeTokenManagerTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/domain/repository/NewsletterSubscriberQueryRepositoryImplTest.java`
-- `src/test/java/web/tosunsaeng/domain/blog/newsletter/domain/repository/RedisNewsletterRateLimitRepositoryTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/api/NewsletterRestControllerTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/api/support/NewsletterClientIpResolverTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/application/NewsletterServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/application/NewsletterRateLimitServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/config/NewsletterMongoIndexInitializerTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/config/NewsletterPropertiesTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/config/NewsletterTelemetryPrivacyConfigTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/entity/NewsletterSubscriberStateTransitionTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterEmailNormalizerTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterRateLimitHasherTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterRateLimitKeyFactoryTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterRedisFailureClassifierTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/policy/NewsletterUnsubscribeTokenManagerTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterSubscriberQueryRepositoryImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/repository/RedisNewsletterRateLimitRepositoryTest.java`
 
 구현 상세를 단일 class로 안전하게 합칠 수 있으면 같은 package 안에서 파일 수를 줄일 수 있다. 반대로 예상 파일 밖 소스 변경이 필요하면 구현을 중단하고 사용자에게 차이와 이유를 보고한다.
 
@@ -207,10 +224,10 @@ Phase 06에서 실제 이메일을 만들 때 원본 token을 DB에 저장하지
 - `src/main/java/web/tosunsaeng/global/common/response/BaseResponse.java`
 - `src/main/java/web/tosunsaeng/global/exception/GlobalExceptionAdvice.java`
 - `src/main/java/web/tosunsaeng/global/config/SecurityConfig.java`
-- 기존 RedisConfig, comment rate limit와 Lua 전체
-- 기존 BlogPost·BlogComment 공개 API와 비즈니스 로직
+- 기존 RedisConfig와 comment rate limit·Lua의 동작
+- 기존 BlogPost·BlogComment 공개 API와 비즈니스 로직(package/import 이동은 승인 범위)
 - `src/main/java/web/tosunsaeng/domain/exams/**`
-- 기존 blog, comment와 exams test
+- 기존 blog와 exams test 및 comment test의 검증 의미(package/import 이동은 승인 범위)
 
 ## API 계약
 
@@ -722,7 +739,7 @@ HTTP 429와 `Retry-After` header를 반환한다.
 실행 예정 검증:
 
 - `git diff --check`
-- `./gradlew test --tests 'web.tosunsaeng.domain.blog.newsletter.*'`
+- `./gradlew test --tests 'web.tosunsaeng.domain.newsletter.*'`
 - `./gradlew clean test bootJar`
 - mapping, verify/PENDING/Sender/Scheduler/internal API, secret·email·token log와 보호 파일을 `rg`·`git diff`로 정적 확인
 
@@ -731,7 +748,7 @@ HTTP 429와 `Retry-After` header를 반환한다.
 ## 기존 blog·comment·exams 영향
 
 - 새 코드는 newsletter package와 newsletter 전용 status/config/resource에 격리한다.
-- 기존 게시글·댓글 Controller, Service, DTO, Document, Repository와 endpoint를 변경하지 않는다.
+- 댓글 main/test는 `web.tosunsaeng.domain.comment`로 이동하지만 Controller, Service, DTO, Document, Repository의 동작과 endpoint는 변경하지 않는다.
 - comment의 RedisTemplate bean은 공유하되 comment key, Lua, properties, secret과 fail-open 흐름을 수정하지 않는다.
 - `SuccessStatus`와 `ErrorStatus`에는 newsletter 상수만 append하고 기존 code/message/status를 변경하지 않는다.
 - GlobalExceptionAdvice와 SecurityConfig는 보호 파일로 둔다.
@@ -766,7 +783,7 @@ HTTP 429와 `Retry-After` header를 반환한다.
 
 ## 완료 조건
 
-- 사용자가 이 DRAFT 계획과 아래 결정 항목을 명시적으로 승인한다.
+- 사용자가 이 계획과 아래 결정 항목을 명시적으로 승인한다.
 - 계획 상태를 `APPROVED`, Phase 05를 `IN_PROGRESS`로 변경한 뒤에만 구현한다.
 - 공개 endpoint는 subscribe POST와 JSON body 기반 unsubscribe POST 두 개뿐이다.
 - `GET /api/newsletter/unsubscribe` mapping이 없고 GET 요청은 Subscriber 상태를 절대 변경하지 않는다.
@@ -777,6 +794,8 @@ HTTP 429와 `Retry-After` header를 반환한다.
 - raw email, IP, token과 secret이 응답, Redis key와 log, exception 또는 Sentry backend request data에 노출되지 않는다.
 - newsletter 2-window rate limit, 최대 TTL Retry-After와 연결 장애 fail-open이 구현된다.
 - 관련 테스트 1~79와 추가 보안 테스트가 모두 성공한다.
+- root package에 맞춘 comment/newsletter test가 모두 성공하고 `.domain.blog.comment`·`.domain.blog.newsletter` source/test package가 남지 않는다.
+- 단순 의존성 주입 생성자에 `@RequiredArgsConstructor`가 적용되고 의미 있는 생성 로직이 있는 생성자는 명시적으로 유지된다.
 - `git diff --check`와 `./gradlew clean test bootJar`가 성공한다.
 - verify API, Sender, Scheduler, `/internal/newsletter`, SecurityConfig 변경과 관련 없는 리팩터링이 없음을 확인한다.
 - 실제 Mongo, Redis, Sentry와 frontend URL query/access log, email scanner 통합 검증을 Phase 08 과제로 기록한다.
@@ -784,7 +803,7 @@ HTTP 429와 `Retry-After` header를 반환한다.
 
 ## 사용자 승인 필요 결정
 
-이번 보정 요청으로 아래 구현 기준은 확정됐으며 선택지를 다시 결정할 필요는 없다. 구현 전에는 이 기준을 포함한 DRAFT 계획 전체에 대한 사용자의 명시적 승인만 남는다.
+이번 보정 요청으로 아래 구현 기준과 root comment/newsletter package 구조, `@RequiredArgsConstructor` 사용 기준까지 확정됐으며 추가 선택지를 다시 결정할 필요는 없다.
 
 1. unsubscribe는 JSON body 기반 POST만 제공하고 GET mapping과 query parameter fallback은 만들지 않는다.
 2. email link는 frontend 확인 page를 가리키며 frontend GET은 상태를 변경하지 않고 사용자 확인 뒤 POST한다.
@@ -799,8 +818,21 @@ HTTP 429와 `Retry-After` header를 반환한다.
 
 ## 실제 구현 중 발생한 차이
 
-없음. 현재는 계획 수립만 수행했으며 Java, test, Gradle, application 설정과 API를 구현하지 않았다.
+- 최초 승인 뒤 사용자가 package 구조를 추가 승인해 comment main/test를 `web.tosunsaeng.domain.comment`, newsletter main/test를 `web.tosunsaeng.domain.newsletter`로 통일했다. 최초 계획의 `.domain.blog.*` 경로는 호환 package로 남기지 않았고 테스트 선택자도 root package로 변경했다.
+- 사용자의 추가 요청에 따라 단순 `final` 의존성 주입 생성자는 `@RequiredArgsConstructor`로 전환했다. `@Qualifier`, 파생 secret·목록, validation 또는 domain 불변식이 필요한 생성자는 명시적으로 유지했다.
+- Sentry privacy callback은 unsubscribe token뿐 아니라 subscribe email과 newsletter POST에 결합된 cookie·IP header/env·user PII도 event와 transaction에서 제거한다. 이는 승인된 email/token/IP 비노출 범위를 더 직접적으로 충족하는 구현 세부사항이며 다른 endpoint와 newsletter GET은 변경하지 않는다.
+- secret separation Bean은 `InitializingBean`의 동작은 유지하되 테스트와 호출자가 불필요한 checked exception을 처리하지 않도록 checked exception을 좁힌 전용 subtype을 반환한다.
+- 테스트 계획 1~79는 여러 assertion을 한 test method에 묶어 newsletter JUnit test 68개로 구현했다. 시나리오를 삭제하거나 비활성화하지 않았다.
+- 공개 API, 상태 전이, token, rate limit, 인덱스와 제외 범위에는 승인 계획과 다른 제품 동작 차이가 없다.
 
 ## 검증 결과
 
-계획 수립 시작 시 branch, clean working tree, preflight, Phase 04 `DONE`과 계획 `EXECUTED`를 확인했다. 최초 DRAFT 작성 후 필수 문서를 규정 순서와 EOF까지 재독했고 필수 heading, 테스트 1~74, DRAFT·PLANNING 상태, 변경 파일 두 개, trailing whitespace와 `git diff --check`를 확인했다. 이후 사용자 보정에 따라 unsubscribe를 POST JSON body로 변경하고 GET 비노출, frontend 확인 page와 부정 테스트 75~79를 추가했다. 보정 후 상태·범위·old GET 성공 계약 부재, 테스트 번호 연속성과 문서 정적 검증을 다시 수행해 성공했다. 구현 test와 build는 계획 승인 전이므로 실행하지 않았다.
+- 구현 시작 시 branch `feat/blog-mvp`, clean working tree, preflight 성공, Phase 04 `DONE`과 계획 `EXECUTED`를 확인했다.
+- `bash ./gradlew compileJava`가 성공했다.
+- `bash ./gradlew test --tests 'web.tosunsaeng.domain.newsletter.*'`가 최종 성공했고 newsletter test 68개가 failures/errors/skipped 0이다.
+- package 이동 회귀를 위해 `bash ./gradlew test --tests 'web.tosunsaeng.domain.comment.*'`를 실행했고 기존 comment test 152개가 성공했다.
+- `bash ./gradlew clean test bootJar`가 최종 `BUILD SUCCESSFUL`이며 전체 283개 test가 failures/errors/skipped 0이고 bootJar가 생성됐다. 기존 blog test 61개와 exams test도 성공했다.
+- `git diff --check`가 성공했다.
+- 정적 검색으로 newsletter GET unsubscribe·verify·internal Controller, newsletter `PENDING`, Sender·Scheduler·Delivery·Campaign, comment PATCH/DELETE, AWS SDK, raw token/email/IP log, newsletter 실제 secret 하드코딩과 옛 `.domain.blog.comment`·`.domain.blog.newsletter` source/test package가 없음을 확인했다.
+- `SecurityConfig`, `GlobalExceptionAdvice`, `build.gradle`은 변경하지 않았다.
+- 실제 MongoDB unique/update 경쟁, Redis Lua·TTL·원자성·standalone topology, Sentry outbound payload와 web/frontend/CDN query log, 실제 email client scanner 동작은 Phase 08 통합 검증 과제로 남긴다.

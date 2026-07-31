@@ -1,9 +1,9 @@
 # 블로그 MVP 구현 상태
 
 - 전체 상태: `IN_PROGRESS`
-- 현재 단계: `Phase 05 — 뉴스레터 구독과 구독 해지`
+- 현재 단계: `Phase 06 — 뉴스레터 15분 자동 발송`
 - 현재 브랜치: `feat/blog-mvp`
-- 마지막 수정 시각: `2026-07-30 17:53:16 KST (+09:00)`
+- 마지막 수정 시각: `2026-07-31 11:02:45 KST (+09:00)`
 
 ## 단계별 상태
 
@@ -14,7 +14,7 @@
 | 02 | 게시글 목록·상세·제목 검색 | `DONE` |
 | 03 | 익명 댓글과 번호 기반 validation | `DONE` |
 | 04 | 댓글 rate limit과 숨김·복원 | `DONE` |
-| 05 | 뉴스레터 구독과 구독 해지 | `PLANNING` |
+| 05 | 뉴스레터 구독과 구독 해지 | `DONE` |
 | 06 | 뉴스레터 15분 자동 발송 | `TODO` |
 | 07 | 내부 운영 API와 보안 | `TODO` |
 | 08 | 전체 회귀 테스트와 API 문서 | `TODO` |
@@ -29,10 +29,11 @@
 - `docs/blog-mvp/plans/PHASE-03-anonymous-comments.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
 - Phase 04는 승인 범위 구현, 댓글 관련 152개 테스트, 전체 215개 테스트와 bootJar 검증을 완료해 `DONE`이다.
 - `docs/blog-mvp/plans/PHASE-04-comment-abuse-moderation.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
-- Current phase는 Phase 05이며 상태는 `PLANNING`이다.
-- `docs/blog-mvp/plans/PHASE-05-newsletter-subscription.md`는 구현 전 사용자 승인을 기다리는 `DRAFT`다.
-- Phase 05 계획은 즉시 ACTIVE 구독, 정규화 email unique, 조건부 재구독, stateless HMAC 해지 token과 newsletter 전용 IP rate limit을 권고한다.
-- 이번 계획 수립에서는 Java, test, Gradle, application 설정과 API를 수정하지 않는다.
+- Phase 05는 승인 구현과 필수 검증을 완료해 `DONE`이다.
+- `docs/blog-mvp/plans/PHASE-05-newsletter-subscription.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
+- Current phase는 Phase 06이며 상태는 `TODO`다.
+- Phase 05는 즉시 ACTIVE 구독, 정규화 email unique, 조건부 재구독, stateless HMAC 해지 token과 newsletter 전용 IP rate limit을 승인 범위로 구현한다.
+- 공개 API는 subscribe POST와 JSON body 기반 unsubscribe POST 두 개뿐이며 GET unsubscribe, verify, email 발송, Scheduler와 internal API는 구현하지 않는다.
 - 저장소에는 Redis Cluster·Sentinel·다중 primary 설정이 없고 단일 `REDIS_HOST`/`REDIS_PORT`만 있어 Phase 04는 standalone/single-primary를 전제로 한다.
 - 여러 visitor/IP/duplicate key를 한 Lua에서 처리하므로 Redis Cluster 전환 시 `CROSSSLOT`을 피하도록 key와 원자성 전략을 재설계해야 한다.
 - client IP는 `request.getRemoteAddr()`만 사용하고 임의 `X-Forwarded-For`는 신뢰하지 않는다.
@@ -939,3 +940,56 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - Phase 08 이관: frontend URL query의 browser history, Referer, frontend hosting/CDN access log와 email scanner 동작 검증
 - 변경 범위: Phase 05 DRAFT 계획서 보정과 이 append-only Session Log 추가만 수행하고 Java, test, Gradle, application/env 설정은 수정하지 않음
 - 다음 단계: 보정된 Phase 05 DRAFT 전체에 대한 사용자 명시적 승인 전 구현 금지
+
+### 2026-07-31 10:06:03 KST — Phase 05 계획 승인 및 구현 시작
+
+- 상태: Phase 05 `IN_PROGRESS`, 계획 `APPROVED`, Current phase Phase 05 유지
+- 승인 근거: 사용자가 보정된 Phase 05 계획과 `web.tosunsaeng.domain.blog.newsletter` 구현 package를 명시적으로 승인함
+- 테스트 선택자: `web.tosunsaeng.domain.blog.newsletter.*`로 정정 승인됐고 `.blog`가 빠진 선택자는 사용하지 않음
+- 시작 브랜치: `feat/blog-mvp`
+- 시작 작업 트리: 사용자가 Phase 05 계획 문서를 검토·커밋한 뒤 clean
+- preflight: `scripts/codex-preflight.sh` 성공
+- 선행 조건: Phase 04 `DONE`, Phase 04 계획 `EXECUTED`
+- 공개 계약: subscribe POST와 JSON body unsubscribe POST만 구현하고 GET unsubscribe, verify와 internal newsletter API는 추가하지 않음
+- 보호 범위: SecurityConfig, 기존 blog/comment/exams, 실제 email Sender·Scheduler·Delivery·Campaign과 운영 외부 접근은 변경·구현하지 않음
+- 구현 원칙: 승인된 예상 파일과 계약 밖 변경이 필요하면 소스 수정을 중단하고 사용자에게 차이를 보고함
+
+### 2026-07-31 10:44:59 KST — Phase 05 package 구조 추가 승인
+
+- 상태 유지: Phase 05 `IN_PROGRESS`, 계획 `APPROVED`, Current phase Phase 05 유지
+- 사용자 추가 승인: 댓글은 `web.tosunsaeng.domain.comment`, 뉴스레터는 `web.tosunsaeng.domain.newsletter`를 정식 main/test package와 물리 경로로 사용함
+- 중복 제거: `.domain.blog.comment`와 `.domain.blog.newsletter` 호환 package를 함께 유지하지 않음
+- 댓글 범위: Phase 03·04 구현은 package 선언, import와 경로만 이동하고 API, validation, Redis 제한, 숨김·복원 동작은 변경하지 않음
+- 테스트 선택자: 뉴스레터는 `web.tosunsaeng.domain.newsletter.*`, 댓글은 `web.tosunsaeng.domain.comment.*`로 변경함
+- 생성자 정책: 단순한 `final` 의존성 주입에는 Lombok `@RequiredArgsConstructor`를 사용하고 검증·변환·도메인 불변식 생성자는 명시적으로 유지함
+- Git 상태: 기존 staged 삭제를 unstage하거나 index를 조작하지 않고 `git add`, `restore`, `reset`, branch 변경을 실행하지 않음
+
+### 2026-07-31 10:56:26 KST — Phase 05 구현 완료 및 검증 시작
+
+- 상태: Phase 05 `VERIFYING`, 계획 `APPROVED`, Current phase Phase 05 유지
+- package: comment/newsletter main·test를 각각 `web.tosunsaeng.domain.comment`, `web.tosunsaeng.domain.newsletter`로 통일하고 옛 `.domain.blog.*` 중복 package를 유지하지 않음
+- 생성자: 단순한 `final` 의존성 주입 생성자를 Lombok `@RequiredArgsConstructor`로 전환하고 qualifier·파생값·domain 검증이 있는 생성자는 명시적으로 유지함
+- 구현: POST subscribe/unsubscribe, 즉시 ACTIVE, 상태별 멱등 처리, stateless HMAC token과 key rotation, Mongo 조건부 update/index, newsletter 전용 Redis IP 제한을 추가함
+- 개인정보: backend unsubscribe token은 JSON body만 사용하고 email·token·IP를 응답·일반 log에서 제외하며 newsletter POST의 Sentry request data/query/cookie/header/env/user PII를 전송 전에 제거함
+- 예비 검증: `compileJava`, root newsletter test 68개, root comment test 전체가 성공함
+- 검증 중 발견·수정: 누락된 Sentry privacy config와 불필요한 checked 설정 검증 signature를 보완하고 nullable exception message의 민감정보 assertion을 안전하게 수정함
+- 다음 검증: `git diff --check`, 전체 clean test/bootJar와 API·제외 범위·민감정보 정적 검색을 수행함
+
+### 2026-07-31 11:02:45 KST — Phase 05 검증 완료
+
+- 상태: Phase 05 `DONE`, 계획 `EXECUTED`, Current phase Phase 06 `TODO`
+- 필수 검사: `git diff --check` 성공
+- 관련 테스트: `bash ./gradlew test --tests 'web.tosunsaeng.domain.newsletter.*'` 성공, newsletter 68개 failures/errors/skipped 0
+- package 회귀: `bash ./gradlew test --tests 'web.tosunsaeng.domain.comment.*'` 성공, comment 152개 failures/errors/skipped 0
+- 전체 검증: `bash ./gradlew clean test bootJar` `BUILD SUCCESSFUL`, 전체 283개 failures/errors/skipped 0, bootJar 생성 성공
+- API review: `POST /api/newsletter/subscribe`, JSON body 기반 `POST /api/newsletter/unsubscribe`만 추가하고 GET unsubscribe, verify, internal newsletter API를 추가하지 않음
+- 상태 review: 유효 email·consent는 즉시 ACTIVE, ACTIVE timestamp 불변 멱등, UNSUBSCRIBED 재구독 tokenVersion 증가, BOUNCED 재구독 generic 409와 해지 허용, PENDING 상태 없음
+- token review: 만료 없는 HMAC-SHA256 stateless token, active/previous key rotation, raw token/hash Mongo 미저장, query fallback·응답·일반 log 노출 없음
+- 동시성 review: email unique, 조건부 재구독·해지 findAndModify, duplicate insert 재조회로 하나의 Subscriber와 멱등 결과에 수렴함
+- rate limit review: 별도 HMAC secret, getRemoteAddr, 10분/하루 standalone Lua fixed window, 최대 TTL Retry-After, connection/timeout만 fail-open함
+- 개인정보 review: newsletter POST의 Sentry event/transaction에서 body/query/cookie/인증·IP header/env/user email·IP를 제거하고 raw email/IP/token/secret을 일반 log와 응답에 포함하지 않음
+- package review: comment/newsletter main·test는 root package만 유지하며 comment HEAD 대비 변경은 package/import와 승인된 `@RequiredArgsConstructor` 전환뿐이고 기존 comment test 전체가 통과함
+- 제외 범위 review: 실제 email Sender·Scheduler·Delivery·Campaign, SecurityConfig, AWS/SMTP/SES, Testcontainers와 실제 MongoDB·Redis·Sentry 접근 없음
+- 승인 계획 차이: 사용자가 후속 승인한 root comment/newsletter package와 `@RequiredArgsConstructor` 기준을 반영했으며 제품 API·상태·보안 계약 차이는 없음
+- Phase 08 이관: 실제 Mongo unique/동시 update, Redis Lua·TTL·원자성·standalone topology, Sentry outbound와 web/frontend/CDN query log, frontend 확인 page와 email scanner 동작 검증
+- 다음 단계: Phase 06은 `TODO`로 유지하며 사용자 코드 검토와 커밋 전 계획 또는 구현을 시작하지 않음

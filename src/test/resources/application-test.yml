@@ -28,3 +28,13 @@ blog:
     abuse:
       secret: test-only-comment-rate-limit-secret-at-least-32-bytes
       enabled: false
+
+newsletter:
+  unsubscribe-token:
+    secret: test-only-newsletter-unsubscribe-active-secret-at-least-32-bytes
+    key-id: active-v1
+    previous-keys:
+      previous-v0: test-only-newsletter-unsubscribe-previous-secret-at-least-32-bytes
+  subscribe-rate-limit:
+    secret: test-only-newsletter-subscribe-rate-secret-at-least-32-bytes
+    enabled: false

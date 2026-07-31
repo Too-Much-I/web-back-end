@@ -35,6 +35,14 @@ blog:
       enabled: ${BLOG_COMMENT_RATE_LIMIT_ENABLED:true}
       duplicate-ttl-seconds: ${BLOG_COMMENT_DUPLICATE_TTL_SECONDS:600}
 
+newsletter:
+  unsubscribe-token:
+    secret: ${NEWSLETTER_UNSUBSCRIBE_TOKEN_SECRET:}
+    key-id: ${NEWSLETTER_UNSUBSCRIBE_TOKEN_KEY_ID:}
+  subscribe-rate-limit:
+    secret: ${NEWSLETTER_SUBSCRIBE_RATE_LIMIT_SECRET:}
+    enabled: ${NEWSLETTER_SUBSCRIBE_RATE_LIMIT_ENABLED:true}
+
 jwt:
   secret: ${JWT_SECRET_KEY:ThisIsATemporarySecretKeyForTosunsaengProject2026!@#}
 

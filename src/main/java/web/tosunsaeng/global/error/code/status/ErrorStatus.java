@@ -57,7 +57,37 @@ public enum ErrorStatus implements BaseErrorCode {
     _COMMENT_RATE_LIMITED(
             HttpStatus.TOO_MANY_REQUESTS,
             "COMMENT_4290",
-            "댓글 작성 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.");
+            "댓글 작성 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
+
+    // Newsletter
+    _NEWSLETTER_EMAIL_REQUIRED(
+            HttpStatus.BAD_REQUEST,
+            "NEWSLETTER_4001",
+            "이메일을 입력해 주세요."),
+    _NEWSLETTER_EMAIL_INVALID(
+            HttpStatus.BAD_REQUEST,
+            "NEWSLETTER_4002",
+            "올바른 이메일 형식을 입력해 주세요."),
+    _NEWSLETTER_EMAIL_TOO_LONG(
+            HttpStatus.BAD_REQUEST,
+            "NEWSLETTER_4003",
+            "이메일은 254자 이하여야 합니다."),
+    _NEWSLETTER_CONSENT_REQUIRED(
+            HttpStatus.BAD_REQUEST,
+            "NEWSLETTER_4004",
+            "뉴스레터 수신 동의가 필요합니다."),
+    _NEWSLETTER_UNSUBSCRIBE_TOKEN_INVALID(
+            HttpStatus.BAD_REQUEST,
+            "NEWSLETTER_4005",
+            "구독 해지 요청이 올바르지 않습니다."),
+    _NEWSLETTER_SUBSCRIPTION_UNAVAILABLE(
+            HttpStatus.CONFLICT,
+            "NEWSLETTER_4091",
+            "뉴스레터 구독 요청을 처리할 수 없습니다."),
+    _NEWSLETTER_SUBSCRIBE_RATE_LIMITED(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "NEWSLETTER_4290",
+            "뉴스레터 구독 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus httpStatus;
     private final String code;

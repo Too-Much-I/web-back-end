@@ -32,7 +32,17 @@ public enum SuccessStatus implements BaseCode {
     BLOG_COMMENT_LIST(HttpStatus.OK, "COMMENT_200", "댓글 목록을 조회했습니다."),
     BLOG_COMMENT_CREATED(HttpStatus.CREATED, "COMMENT_201", "댓글을 작성했습니다."),
     ANONYMOUS_PROFILE_REGENERATED(HttpStatus.OK, "COMMENT_202", "익명 프로필을 재생성했습니다."),
-    BLOG_COMMENT_REQUEST_ACCEPTED(HttpStatus.ACCEPTED, "COMMENT_203", "요청이 접수되었습니다.");
+    BLOG_COMMENT_REQUEST_ACCEPTED(HttpStatus.ACCEPTED, "COMMENT_203", "요청이 접수되었습니다."),
+
+    // Newsletter
+    NEWSLETTER_SUBSCRIBED(
+            HttpStatus.OK,
+            "NEWSLETTER_200",
+            "뉴스레터 구독 요청이 처리되었습니다."),
+    NEWSLETTER_UNSUBSCRIBED(
+            HttpStatus.OK,
+            "NEWSLETTER_201",
+            "뉴스레터 구독이 해지되었습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
