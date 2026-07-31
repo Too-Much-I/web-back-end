@@ -69,6 +69,8 @@ class BlogCommentModerationServiceImplTest {
         when(commentRepository.findCommentsForModeration(
                 CommentStatus.HIDDEN, "post-id", FROM, TO, pageable))
                 .thenReturn(new PageImpl<>(List.of(comment), pageable, 21));
+        when(postRepository.findAllById(List.of("post-id")))
+                .thenReturn(List.of(post("post-id", "post-slug")));
 
         BlogCommentModerationDTO.ModeratedCommentPageResult result =
                 service.getComments(filter(
@@ -84,8 +86,9 @@ class BlogCommentModerationServiceImplTest {
         assertThat(result.isHasNext()).isFalse();
         BlogCommentModerationDTO.ModeratedCommentResult item =
                 result.getComments().getFirst();
-        assertThat(item.getId()).isEqualTo("comment-id");
+        assertThat(item.getCommentId()).isEqualTo("comment-id");
         assertThat(item.getPostId()).isEqualTo("post-id");
+        assertThat(item.getPostSlug()).isEqualTo("post-slug");
         assertThat(item.getStatus()).isEqualTo(CommentStatus.HIDDEN);
         assertThat(item.getHiddenReason()).isEqualTo(HiddenReason.SPAM);
         assertThat(item.getAvatarImageUrl())
@@ -95,8 +98,12 @@ class BlogCommentModerationServiceImplTest {
                 .doesNotContain(
                         "anonymousVisitorId",
                         "tokenHash",
+                        "avatarSeed",
+                        "avatarImageKey",
+                        "updatedAt",
                         "ipHash",
                         "reservationOwner");
+        verify(postRepository).findAllById(List.of("post-id"));
     }
 
     @Test
@@ -130,6 +137,37 @@ class BlogCommentModerationServiceImplTest {
         assertThat(result.getPage()).isEqualTo(2);
         assertThat(result.getSize()).isEqualTo(20);
         verifyNoInteractions(commentRepository);
+    }
+
+    @Test
+    void resolvesDistinctPostSlugsInOneBatchWithoutNPlusOneQueries() {
+        PageRequest pageable = PageRequest.of(0, 20);
+        BlogComment first = comment(
+                "comment-a",
+                "post-a",
+                CommentStatus.VISIBLE,
+                null);
+        BlogComment second = comment(
+                "comment-b",
+                "post-b",
+                CommentStatus.HIDDEN,
+                HiddenReason.SPAM);
+        when(commentRepository.findCommentsForModeration(
+                null, null, null, null, pageable))
+                .thenReturn(new PageImpl<>(List.of(first, second), pageable, 2));
+        when(postRepository.findAllById(List.of("post-a", "post-b")))
+                .thenReturn(List.of(
+                        post("post-a", "slug-a"),
+                        post("post-b", "slug-b")));
+
+        var result = service.getComments(filter(
+                null, null, null, null, null, 0, 20));
+
+        assertThat(result.getComments())
+                .extracting(BlogCommentModerationDTO.ModeratedCommentResult::getPostSlug)
+                .containsExactly("slug-a", "slug-b");
+        verify(postRepository).findAllById(List.of("post-a", "post-b"));
+        verify(postRepository, never()).findById(any());
     }
 
     @Test
@@ -216,9 +254,17 @@ class BlogCommentModerationServiceImplTest {
     }
 
     private BlogComment comment(CommentStatus status, HiddenReason hiddenReason) {
+        return comment("comment-id", "post-id", status, hiddenReason);
+    }
+
+    private BlogComment comment(
+            String commentId,
+            String postId,
+            CommentStatus status,
+            HiddenReason hiddenReason) {
         return BlogComment.builder()
-                .id("comment-id")
-                .postId("post-id")
+                .id(commentId)
+                .postId(postId)
                 .anonymousVisitorId("visitor-secret-id")
                 .nickname("차분한 수달")
                 .avatarSeed("seed")
@@ -229,6 +275,14 @@ class BlogCommentModerationServiceImplTest {
                 .updatedAt(NOW)
                 .hiddenAt(status == CommentStatus.HIDDEN ? NOW : null)
                 .hiddenReason(hiddenReason)
+                .build();
+    }
+
+    private BlogPost post(String id, String slug) {
+        return BlogPost.builder()
+                .id(id)
+                .slug(slug)
+                .status(BlogPostStatus.DRAFT)
                 .build();
     }
 

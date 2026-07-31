@@ -277,6 +277,63 @@ class NewsletterDeliveryQueryRepositoryImplTest {
     }
 
     @Test
+    void manualRetryCandidateBatchUsesCampaignEligibilityIdOrderAndLimit() {
+        NewsletterDelivery first = delivery(NewsletterDeliveryStatus.FAILED, 1);
+        when(mongoTemplate.find(any(Query.class), eq(NewsletterDelivery.class)))
+                .thenReturn(List.of(first));
+
+        assertThat(repository.findManualRetryCandidateIds(
+                "campaign-id", 4, 101)).containsExactly("delivery-id");
+
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(captor.capture(), eq(NewsletterDelivery.class));
+        Query query = captor.getValue();
+        assertThat(query.getQueryObject())
+                .containsEntry("campaignId", "campaign-id")
+                .containsEntry("status", NewsletterDeliveryStatus.FAILED)
+                .containsEntry("retryable", true)
+                .containsEntry("attemptCount", new Document("$lt", 4))
+                .containsEntry("lastErrorCode", new Document(
+                        "$ne", NewsletterFailureType.PROVIDER_RESULT_UNKNOWN));
+        assertThat(query.getLimit()).isEqualTo(101);
+        assertThat(query.getSortObject())
+                .containsEntry("_id", 1);
+        assertThat(query.getFieldsObject())
+                .containsEntry("_id", 1);
+    }
+
+    @Test
+    void inactiveSkipRepeatsAllManualEligibilityConditionsAtomically() {
+        when(mongoTemplate.updateFirst(
+                any(Query.class),
+                any(Update.class),
+                eq(NewsletterDelivery.class)))
+                .thenReturn(UpdateResult.acknowledged(1, 1L, null));
+
+        assertThat(repository.skipFailedInactive(
+                "delivery-id", 4, NOW)).isTrue();
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.forClass(Update.class);
+        verify(mongoTemplate).updateFirst(
+                queryCaptor.capture(),
+                updateCaptor.capture(),
+                eq(NewsletterDelivery.class));
+        assertThat(queryCaptor.getValue().getQueryObject())
+                .containsEntry("_id", "delivery-id")
+                .containsEntry("status", NewsletterDeliveryStatus.FAILED)
+                .containsEntry("retryable", true)
+                .containsEntry("attemptCount", new Document("$lt", 4))
+                .containsEntry("lastErrorCode", new Document(
+                        "$ne", NewsletterFailureType.PROVIDER_RESULT_UNKNOWN));
+        Document set = updateCaptor.getValue().getUpdateObject().get("$set", Document.class);
+        assertThat(set)
+                .containsEntry("status", NewsletterDeliveryStatus.SKIPPED)
+                .containsEntry("retryable", false)
+                .containsEntry("skippedAt", NOW);
+    }
+
+    @Test
     void campaignCountsTreatOnlyNonRetryableOrExhaustedFailuresAsTerminal() {
         when(mongoTemplate.count(any(Query.class), eq(NewsletterDelivery.class)))
                 .thenReturn(4L, 2L, 1L, 1L);

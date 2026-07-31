@@ -31,17 +31,27 @@ public class BlogCommentModerationDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ModeratedCommentResult {
-        private String id;
+        private String commentId;
         private String postId;
+        private String postSlug;
         private String nickname;
-        private String avatarSeed;
         private String avatarImageUrl;
         private String content;
         private CommentStatus status;
         private Instant createdAt;
-        private Instant updatedAt;
         private Instant hiddenAt;
         private HiddenReason hiddenReason;
+    }
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ModerationTransitionResult {
+        private String id;
+        private CommentStatus status;
+        private HiddenReason hiddenReason;
+        private Instant hiddenAt;
     }
 
     @Getter

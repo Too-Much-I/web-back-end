@@ -4,7 +4,6 @@ import io.sentry.SentryEvent;
 import io.sentry.SentryOptions;
 import io.sentry.protocol.Request;
 import io.sentry.protocol.SentryTransaction;
-import io.sentry.protocol.User;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -23,24 +22,39 @@ public class NewsletterTelemetryPrivacyConfig {
             "/api/newsletter/unsubscribe");
     private static final String ONE_CLICK_PREFIX =
             "/api/newsletter/one-click-unsubscribe/";
+    private static final String INTERNAL_PREFIX = "/internal/";
     private static final String REDACTED_ONE_CLICK_PATH =
             "/api/newsletter/one-click-unsubscribe/{token}";
     private static final Set<String> SENSITIVE_HEADERS = Set.of(
+            "x-internal-api-key",
             "authorization",
             "cookie",
             "forwarded",
             "x-forwarded-for",
+            "x-forwarded-host",
+            "x-forwarded-proto",
+            "x-forwarded-port",
             "x-real-ip",
             "cf-connecting-ip",
-            "true-client-ip");
+            "true-client-ip",
+            "x-client-ip",
+            "x-cluster-client-ip");
     private static final Set<String> SENSITIVE_ENVS = Set.of(
             "remote_addr",
             "remote_host",
+            "http_x_internal_api_key",
             "http_authorization",
             "http_cookie",
             "http_forwarded",
             "http_x_forwarded_for",
-            "http_x_real_ip");
+            "http_x_forwarded_host",
+            "http_x_forwarded_proto",
+            "http_x_forwarded_port",
+            "http_x_real_ip",
+            "http_cf_connecting_ip",
+            "http_true_client_ip",
+            "http_x_client_ip",
+            "http_x_cluster_client_ip");
 
     @Bean
     public SentryOptions.BeforeSendCallback newsletterBeforeSendCallback() {
@@ -63,28 +77,29 @@ public class NewsletterTelemetryPrivacyConfig {
     }
 
     static void sanitize(SentryEvent event) {
-        if (event == null || !isSensitiveNewsletterRequest(event.getRequest())) {
+        if (event == null || !isSensitiveRequest(event.getRequest())) {
             return;
         }
         sanitizeRequest(event.getRequest());
-        sanitizeUser(event.getUser());
+        event.setUser(null);
     }
 
     static void sanitize(SentryTransaction transaction) {
         if (transaction == null
-                || !isSensitiveNewsletterRequest(transaction.getRequest())) {
+                || !isSensitiveRequest(transaction.getRequest())) {
             return;
         }
         sanitizeRequest(transaction.getRequest());
-        sanitizeUser(transaction.getUser());
+        transaction.setUser(null);
     }
 
-    private static boolean isSensitiveNewsletterRequest(Request request) {
+    private static boolean isSensitiveRequest(Request request) {
         if (request == null) {
             return false;
         }
         String path = extractPath(request.getUrl());
-        return path != null && (path.startsWith(ONE_CLICK_PREFIX)
+        return path != null && (path.startsWith(INTERNAL_PREFIX)
+                || path.startsWith(ONE_CLICK_PREFIX)
                 || ("POST".equalsIgnoreCase(request.getMethod())
                 && SENSITIVE_PATHS.contains(path)));
     }
@@ -112,15 +127,6 @@ public class NewsletterTelemetryPrivacyConfig {
         request.setEnvs(removeSensitiveEntries(
                 request.getEnvs(),
                 SENSITIVE_ENVS));
-    }
-
-    private static void sanitizeUser(User user) {
-        if (user == null) {
-            return;
-        }
-        user.setEmail(null);
-        user.setIpAddress(null);
-        user.setUsername(null);
     }
 
     private static Map<String, String> removeSensitiveEntries(

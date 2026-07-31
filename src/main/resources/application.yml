@@ -64,6 +64,11 @@ newsletter:
     test-recipient-allowlist: ${NEWSLETTER_TEST_RECIPIENT_ALLOWLIST:}
     aws-region: ${AWS_REGION:ap-northeast-2}
 
+internal:
+  api:
+    enabled: ${INTERNAL_API_ENABLED:false}
+    key: ${INTERNAL_API_KEY:}
+
 jwt:
   secret: ${JWT_SECRET_KEY:ThisIsATemporarySecretKeyForTosunsaengProject2026!@#}
 

@@ -8,9 +8,9 @@ public interface BlogCommentModerationService {
     BlogCommentModerationDTO.ModeratedCommentPageResult getComments(
             BlogCommentModerationDTO.CommentFilter filter);
 
-    BlogCommentModerationDTO.ModeratedCommentResult hide(
+    BlogCommentModerationDTO.ModerationTransitionResult hide(
             String commentId,
             HiddenReason reason);
 
-    BlogCommentModerationDTO.ModeratedCommentResult restore(String commentId);
+    BlogCommentModerationDTO.ModerationTransitionResult restore(String commentId);
 }

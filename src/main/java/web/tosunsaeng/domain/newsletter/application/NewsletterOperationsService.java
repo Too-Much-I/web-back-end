@@ -6,7 +6,11 @@ public interface NewsletterOperationsService {
 
     boolean cancelScheduledCampaign(String campaignId);
 
+    void cancelScheduledCampaignByPostId(String postId);
+
     ManualRetryResult retryFailedDelivery(String deliveryId);
+
+    ManualRetryBatchResult retryFailedDeliveriesByPostId(String postId);
 
     enum TestSendResult {
         SENT,
@@ -17,5 +21,11 @@ public interface NewsletterOperationsService {
         REQUEUED,
         SKIPPED_INACTIVE,
         REJECTED
+    }
+
+    record ManualRetryBatchResult(
+            int retriedCount,
+            int skippedCount,
+            boolean hasMore) {
     }
 }

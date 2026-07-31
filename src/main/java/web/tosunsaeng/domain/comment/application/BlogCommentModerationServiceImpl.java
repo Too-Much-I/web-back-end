@@ -15,6 +15,8 @@ import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,7 +39,9 @@ public class BlogCommentModerationServiceImpl implements BlogCommentModerationSe
         if (slug != null) {
             var post = blogPostRepository.findBySlug(slug);
             if (post.isEmpty()) {
-                return converter.toPageResult(Page.empty(pageable));
+                return converter.toPageResult(
+                        Page.empty(pageable),
+                        Map.of());
             }
             postId = post.get().getId();
         }
@@ -48,11 +52,11 @@ public class BlogCommentModerationServiceImpl implements BlogCommentModerationSe
                 filter.getCreatedAtFrom(),
                 filter.getCreatedAtTo(),
                 pageable);
-        return converter.toPageResult(comments);
+        return converter.toPageResult(comments, postSlugById(comments));
     }
 
     @Override
-    public BlogCommentModerationDTO.ModeratedCommentResult hide(
+    public BlogCommentModerationDTO.ModerationTransitionResult hide(
             String commentId,
             HiddenReason reason) {
         validateCommentId(commentId);
@@ -62,16 +66,16 @@ public class BlogCommentModerationServiceImpl implements BlogCommentModerationSe
         Instant now = clock.instant();
         BlogComment comment = blogCommentRepository.hideComment(commentId, reason, now)
                 .orElseGet(() -> throwTransitionFailure(commentId));
-        return converter.toResult(comment);
+        return converter.toTransitionResult(comment);
     }
 
     @Override
-    public BlogCommentModerationDTO.ModeratedCommentResult restore(String commentId) {
+    public BlogCommentModerationDTO.ModerationTransitionResult restore(String commentId) {
         validateCommentId(commentId);
         Instant now = clock.instant();
         BlogComment comment = blogCommentRepository.restoreComment(commentId, now)
                 .orElseGet(() -> throwTransitionFailure(commentId));
-        return converter.toResult(comment);
+        return converter.toTransitionResult(comment);
     }
 
     private void validateFilter(BlogCommentModerationDTO.CommentFilter filter) {
@@ -111,5 +115,22 @@ public class BlogCommentModerationServiceImpl implements BlogCommentModerationSe
             throw new BlogCommentException(ErrorStatus._COMMENT_NOT_FOUND);
         }
         throw new BlogCommentException(ErrorStatus._COMMENT_STATE_CONFLICT);
+    }
+
+    private Map<String, String> postSlugById(Page<BlogComment> comments) {
+        var postIds = comments.getContent().stream()
+                .map(BlogComment::getPostId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        if (postIds.isEmpty()) {
+            return Map.of();
+        }
+        return blogPostRepository.findAllById(postIds).stream()
+                .filter(post -> post.getId() != null && post.getSlug() != null)
+                .collect(Collectors.toUnmodifiableMap(
+                        post -> post.getId(),
+                        post -> post.getSlug(),
+                        (first, ignored) -> first));
     }
 }

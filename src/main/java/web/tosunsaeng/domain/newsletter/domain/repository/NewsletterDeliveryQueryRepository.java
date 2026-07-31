@@ -5,6 +5,7 @@ import web.tosunsaeng.domain.newsletter.domain.enums.NewsletterFailureType;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface NewsletterDeliveryQueryRepository {
@@ -64,7 +65,15 @@ public interface NewsletterDeliveryQueryRepository {
             int maxAttempts,
             Instant now);
 
-    boolean skipFailedInactive(String deliveryId, Instant now);
+    List<String> findManualRetryCandidateIds(
+            String campaignId,
+            int maxAttempts,
+            int limit);
+
+    boolean skipFailedInactive(
+            String deliveryId,
+            int maxAttempts,
+            Instant now);
 
     DeliveryCounts countByCampaign(String campaignId, int maxAttempts);
 

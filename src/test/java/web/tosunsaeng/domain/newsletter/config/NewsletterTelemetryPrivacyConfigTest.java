@@ -29,7 +29,7 @@ class NewsletterTelemetryPrivacyConfigTest {
                 .execute(event, new Hint());
 
         assertSanitized(event.getRequest());
-        assertThat(event.getUser().getIpAddress()).isNull();
+        assertThat(event.getUser()).isNull();
         assertThat(event.getRequest().getUrl())
                 .isEqualTo("https://api.example.test/api/newsletter/subscribe");
     }
@@ -58,8 +58,7 @@ class NewsletterTelemetryPrivacyConfigTest {
         assertSanitized(transaction.getRequest());
         assertThat(transaction.getRequest().getUrl())
                 .isEqualTo("https://api.example.test/api/newsletter/unsubscribe");
-        assertThat(transaction.getUser().getEmail()).isNull();
-        assertThat(transaction.getUser().getIpAddress()).isNull();
+        assertThat(transaction.getUser()).isNull();
     }
 
     @Test
@@ -117,6 +116,55 @@ class NewsletterTelemetryPrivacyConfigTest {
         assertThat(result).isNull();
     }
 
+    @Test
+    void redactsInternalApiKeyEmailCommentBodyAndProxyDataFromEvent() {
+        SentryEvent event = new SentryEvent();
+        event.setRequest(sensitiveRequest(
+                "https://api.example.test/internal/newsletter/posts/post-id/test?email=user@example.com"));
+        User user = new User();
+        user.setId("operator-id");
+        user.setEmail("user@example.com");
+        user.setUsername("operator");
+        user.setIpAddress("203.0.113.10");
+        event.setUser(user);
+
+        new NewsletterTelemetryPrivacyConfig()
+                .newsletterBeforeSendCallback()
+                .execute(event, new Hint());
+
+        assertSanitized(event.getRequest());
+        assertThat(event.getRequest().getUrl())
+                .isEqualTo("https://api.example.test/internal/newsletter/posts/post-id/test");
+        assertThat(event.getRequest().getHeaders())
+                .doesNotContainKeys(
+                        "X-Internal-Api-Key",
+                        "Forwarded",
+                        "X-Forwarded-Host",
+                        "X-Forwarded-Proto");
+        assertThat(event.getUser()).isNull();
+    }
+
+    @Test
+    void sanitizesButDoesNotDropInternalTransaction() {
+        SentryTransaction transaction = new SentryTransaction(
+                "PATCH /internal/comments/{commentId}/hide",
+                1.0,
+                2.0,
+                List.of(),
+                Map.of(),
+                null,
+                new TransactionInfo("custom"));
+        transaction.setRequest(sensitiveRequest(
+                "https://api.example.test/internal/comments/comment-id/hide"));
+
+        SentryTransaction result = new NewsletterTelemetryPrivacyConfig()
+                .newsletterBeforeSendTransactionCallback()
+                .execute(transaction, new Hint());
+
+        assertThat(result).isSameAs(transaction);
+        assertSanitized(result.getRequest());
+    }
+
     private Request sensitiveRequest(String url) {
         Request request = new Request();
         request.setMethod("POST");
@@ -124,15 +172,22 @@ class NewsletterTelemetryPrivacyConfigTest {
         request.setQueryString("token=sensitive-token&email=user@example.com");
         request.setData(Map.of(
                 "email", "user@example.com",
-                "token", "sensitive-token"));
+                "token", "sensitive-token",
+                "content", "sensitive comment body"));
         request.setCookies("anon_session=sensitive-cookie-token");
         request.setHeaders(Map.of(
                 "Content-Type", "application/json",
                 "Cookie", "anon_session=sensitive-cookie-token",
                 "Authorization", "Bearer sensitive-token",
-                "X-Forwarded-For", "203.0.113.10"));
+                "X-Internal-Api-Key", "sensitive-internal-key",
+                "X-Forwarded-For", "203.0.113.10",
+                "Forwarded", "for=203.0.113.10",
+                "X-Forwarded-Host", "proxy.example.test",
+                "X-Forwarded-Proto", "https"));
         request.setEnvs(Map.of(
                 "REMOTE_ADDR", "203.0.113.10",
+                "HTTP_X_INTERNAL_API_KEY", "sensitive-internal-key",
+                "HTTP_X_FORWARDED_HOST", "proxy.example.test",
                 "SAFE_VALUE", "kept"));
         return request;
     }
@@ -146,9 +201,16 @@ class NewsletterTelemetryPrivacyConfigTest {
                 .doesNotContainKeys(
                         "Cookie",
                         "Authorization",
-                        "X-Forwarded-For");
+                        "X-Internal-Api-Key",
+                        "X-Forwarded-For",
+                        "Forwarded",
+                        "X-Forwarded-Host",
+                        "X-Forwarded-Proto");
         assertThat(request.getEnvs())
                 .containsEntry("SAFE_VALUE", "kept")
-                .doesNotContainKey("REMOTE_ADDR");
+                .doesNotContainKeys(
+                        "REMOTE_ADDR",
+                        "HTTP_X_INTERNAL_API_KEY",
+                        "HTTP_X_FORWARDED_HOST");
     }
 }

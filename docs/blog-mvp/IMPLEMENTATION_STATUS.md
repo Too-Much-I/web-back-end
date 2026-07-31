@@ -1,9 +1,9 @@
 # 블로그 MVP 구현 상태
 
 - 전체 상태: `IN_PROGRESS`
-- 현재 단계: `Phase 07 — 내부 운영 API와 보안`
+- 현재 단계: `Phase 08 — 전체 회귀 테스트와 API 문서`
 - 현재 브랜치: `feat/blog-mvp`
-- 마지막 수정 시각: `2026-07-31 14:18:26 KST (+09:00)`
+- 마지막 수정 시각: `2026-07-31 15:31:29 KST (+09:00)`
 
 ## 단계별 상태
 
@@ -16,7 +16,7 @@
 | 04 | 댓글 rate limit과 숨김·복원 | `DONE` |
 | 05 | 뉴스레터 구독과 구독 해지 | `DONE` |
 | 06 | 뉴스레터 15분 자동 발송 | `DONE` |
-| 07 | 내부 운영 API와 보안 | `TODO` |
+| 07 | 내부 운영 API와 보안 | `DONE` |
 | 08 | 전체 회귀 테스트와 API 문서 | `TODO` |
 
 ## 현재 단계의 목표
@@ -33,18 +33,86 @@
 - `docs/blog-mvp/plans/PHASE-05-newsletter-subscription.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
 - Phase 06은 승인 범위 구현과 필수 검증을 완료해 `DONE`이다.
 - `docs/blog-mvp/plans/PHASE-06-newsletter-delivery.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
-- Current phase는 Phase 07이며 상태는 `TODO`다.
+- Phase 07은 승인 범위 구현과 필수 검증을 완료해 `DONE`이다.
+- `docs/blog-mvp/plans/PHASE-07-internal-operations-security.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
+- Phase 07은 댓글 조회·숨김·복원과 뉴스레터 테스트 발송·예약 취소·실패 재시도를 `/internal/**`로 노출하고 별도 우선순위 SecurityFilterChain의 API Key 인증으로 보호한다.
+- Current phase는 Phase 08이며 상태는 `TODO`다.
 - Phase 06은 DB 직접 작성 BlogPost reconciliation, 15분 예약, Campaign/Delivery unique와 원자 claim, bounded 발송, SES v2, retry, kill switch 및 RFC 8058을 구현했다.
 - 조건부 승인은 claimExpiresAt, SecureRandom token, kill switch의 상태 무변경, 개별 AWS SDK 2.29.52, public/API base URL 분리, path token one-click과 test send allowlist를 확정했다.
 - Phase 06에서는 공개 one-click unsubscribe POST를 제외한 운영 Controller, `/internal/newsletter/**`, API Key 인증과 SecurityConfig 변경을 구현하지 않는다.
 - Phase 05는 즉시 ACTIVE 구독, 정규화 email unique, 조건부 재구독, stateless HMAC 해지 token과 newsletter 전용 IP rate limit을 승인 범위로 구현한다.
-- 공개 API는 subscribe POST와 JSON body 기반 unsubscribe POST 두 개뿐이며 GET unsubscribe, verify, email 발송, Scheduler와 internal API는 구현하지 않는다.
+- Phase 05 종료 당시 공개 API는 subscribe POST와 JSON body 기반 unsubscribe POST 두 개였으며 GET unsubscribe, verify, email 발송, Scheduler와 internal API는 구현하지 않았다.
 - 저장소에는 Redis Cluster·Sentinel·다중 primary 설정이 없고 단일 `REDIS_HOST`/`REDIS_PORT`만 있어 Phase 04는 standalone/single-primary를 전제로 한다.
 - 여러 visitor/IP/duplicate key를 한 Lua에서 처리하므로 Redis Cluster 전환 시 `CROSSSLOT`을 피하도록 key와 원자성 전략을 재설계해야 한다.
 - client IP는 `request.getRemoteAddr()`만 사용하고 임의 `X-Forwarded-For`는 신뢰하지 않는다.
 - duplicate reservation은 Mongo save 전에 owner token으로 만들고 Mongo 실패 시 owner 일치 Lua로만 해제하며 rate counter는 rollback하지 않는다.
 
 ## 변경 파일
+
+Phase 07 계획 수립에서 변경한 파일:
+
+- `docs/blog-mvp/plans/PHASE-07-internal-operations-security.md`
+- `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+
+Phase 07 계획 수립에서 수정하지 않는 파일:
+
+- Java 소스와 기존 테스트 전체
+- `build.gradle`, main/test application 설정과 `.env.example`
+- `SecurityConfig`, JWT Filter/Provider와 Sentry privacy config
+- 기존 blog, comment, newsletter와 exams 비즈니스 로직
+
+Phase 07 구현에서 생성한 main 파일:
+
+- `src/main/java/web/tosunsaeng/domain/comment/api/InternalCommentController.java`
+- `src/main/java/web/tosunsaeng/domain/comment/dto/InternalCommentRequestDTO.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/api/InternalNewsletterController.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/dto/InternalNewsletterRequestDTO.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/dto/InternalNewsletterResponseDTO.java`
+- `src/main/java/web/tosunsaeng/global/config/InternalApiSecurityConfig.java`
+- `src/main/java/web/tosunsaeng/global/config/security/InternalApiKeyAuthenticationFilter.java`
+- `src/main/java/web/tosunsaeng/global/config/security/InternalApiKeyVerifier.java`
+- `src/main/java/web/tosunsaeng/global/config/security/InternalApiProperties.java`
+- `src/main/java/web/tosunsaeng/global/exception/InternalOperationsExceptionAdvice.java`
+
+Phase 07 구현에서 생성한 test 파일:
+
+- `src/test/java/web/tosunsaeng/domain/comment/api/InternalCommentControllerTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/api/InternalNewsletterControllerTest.java`
+- `src/test/java/web/tosunsaeng/global/config/InternalApiSecurityContractTest.java`
+- `src/test/java/web/tosunsaeng/global/config/security/InternalApiKeyVerifierTest.java`
+- `src/test/java/web/tosunsaeng/global/config/security/InternalApiPropertiesTest.java`
+
+Phase 07 구현에서 수정한 파일:
+
+- `.env.example`
+- `docs/blog-mvp/plans/PHASE-07-internal-operations-security.md`
+- `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+- `src/main/resources/application.yml`
+- `src/test/resources/application-test.yml`
+- `src/main/java/web/tosunsaeng/domain/comment/application/BlogCommentModerationService.java`
+- `src/main/java/web/tosunsaeng/domain/comment/application/BlogCommentModerationServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/comment/converter/BlogCommentModerationConverter.java`
+- `src/main/java/web/tosunsaeng/domain/comment/dto/BlogCommentModerationDTO.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/application/NewsletterOperationsService.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/application/NewsletterOperationsServiceImpl.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/config/NewsletterTelemetryPrivacyConfig.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterDeliveryQueryRepository.java`
+- `src/main/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterDeliveryQueryRepositoryImpl.java`
+- `src/main/java/web/tosunsaeng/global/config/SecurityConfig.java`
+- `src/main/java/web/tosunsaeng/global/error/code/status/ErrorStatus.java`
+- `src/main/java/web/tosunsaeng/global/error/code/status/SuccessStatus.java`
+- `src/test/java/web/tosunsaeng/domain/comment/application/BlogCommentModerationServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/application/NewsletterOperationsServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/config/NewsletterTelemetryPrivacyConfigTest.java`
+- `src/test/java/web/tosunsaeng/domain/newsletter/domain/repository/NewsletterDeliveryQueryRepositoryImplTest.java`
+
+Phase 07 구현에서 변경하지 않은 보호 파일과 범위:
+
+- `build.gradle`, 기존 public Controller와 공개 API 계약
+- `JwtAuthenticationFilter`, `JwtTokenProvider`, 기존 CORS 설정과 JWT 동작
+- BlogPost, Campaign, Delivery와 Subscriber Document 및 Mongo index
+- comment validation/rate-limit, newsletter Scheduler/Sender와 exams source
+- 실제 인프라, MongoDB, Redis, SES, Sentry와 외부 email
 
 Phase 06 구현에서 생성한 main 파일:
 
@@ -699,10 +767,10 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 
 ## 다음 작업
 
-1. 사용자의 Phase 06 코드 검토를 기다리고 승인 전 Git add, commit 또는 push를 수행하지 않는다.
-2. Phase 07은 `TODO`로 유지하며 사용자가 요청하기 전 계획 수립이나 구현을 시작하지 않는다.
-3. Phase 07 계획에서는 운영 Controller를 `/internal/**`에 두고 API Key 인증과 SecurityConfig 변경을 별도 승인 범위로 다룬다.
-4. Phase 08 전체 검수에서 실제 Mongo claim 및 unique index, 실제 SES와 Redis, bounce/complaint, email client one-click, frontend/CDN path token log, DKIM과 대량 부하를 검증한다.
+1. Phase 07 구현 diff를 승인 범위와 대조하고 관련 테스트, 전체 clean build와 정적 검사를 수행한다.
+2. 실패가 하나라도 있으면 Phase 07을 `DONE`으로 변경하지 않고 원인과 상태를 append-only로 기록한다.
+3. 모든 검증 성공 시에만 계획 `EXECUTED`, Phase 07 `DONE`, Current phase Phase 08로 전환한다.
+4. Phase 08 전체 검수에서 실제 proxy 접근 제한, key rotation, Sentry/access log, Mongo 상태 전이와 실제 테스트 email을 검증한다.
 
 ## Session Log
 
@@ -1194,3 +1262,64 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 회귀 구성: blog 66개, comment 152개, newsletter 149개, exams Repository scan 1개와 application context 1개
 - 범위 재확인: SecurityConfig, 기존 API, Subscriber 상태, Raw MIME, internal Controller와 실제 외부 시스템 접근에 추가 변경 없음
 - 다음 단계: 사용자 코드 검토를 기다리며 Phase 07은 `TODO`로 유지함
+
+### 2026-07-31 14:34:54 KST — Phase 07 DRAFT 계획 수립
+
+- 상태: Phase 07 `PLANNING`, 계획 `DRAFT`, Current phase Phase 07 유지
+- 시작 브랜치: `feat/blog-mvp`
+- 시작 작업 트리: clean
+- 사전 점검: `scripts/codex-preflight.sh` 성공
+- 선행 조건: Phase 06 `DONE`, Phase 06 계획 `EXECUTED`
+- 필수 문서: `AGENTS.md`, `PLANS.md`, `REQUIREMENTS.md`, `WORKFLOW.md`, 이 상태 문서와 Phase 06 계획서를 지정 순서와 EOF까지 읽음
+- 실제 분석: root comment/newsletter/blog package, Phase 04 moderation Service, Phase 06 operations Service와 Repository 상태 전이, SecurityConfig/JWT, BaseResponse/status/advice, main/test 설정, Sentry privacy와 기존 test 구조를 확인함
+- 주요 차이: 댓글 moderation DTO에는 postSlug가 없고 avatarSeed가 있으며, newsletter cancel/retry Service는 campaignId/deliveryId 단건 기준이라 Phase 07 postId API용 안전한 orchestration이 필요함
+- 인증 권고: `INTERNAL_API_ENABLED` 기본 false와 disabled 404, enabled key UTF-8 32바이트 fail-fast, SHA-256 fixed digest constant-time 비교, JWT 뒤 ROLE_INTERNAL Filter
+- API 권고: allowlist 밖 test recipient 400, test disabled와 상태 충돌 409, provider 실패 502, Campaign 기반 cursor batch 100 retry와 Swagger internal Controller 숨김
+- 개인정보 권고: 기존 Sentry callback을 `/internal/**`로 확장하고 API key, auth/cookie/proxy/IP header, request data와 user PII를 제거하며 일반 log에는 key, email, content, token과 provider payload를 남기지 않음
+- 변경 파일: Phase 07 계획서와 이 상태 문서 두 개뿐이며 Java, test, Gradle, application/env 설정과 SecurityConfig는 수정하지 않음
+- 검증 이관: 실제 ALB/proxy 접근 제한, key rotation, Sentry/access log, Mongo 동시 상태 전이와 실제 test email은 Phase 08로 기록함
+- 다음 단계: 생성 직후 필수 문서 재독과 정적 검증을 완료하고 사용자 명시적 승인을 기다림
+
+### 2026-07-31 14:43:03 KST — Phase 07 조건부 승인 및 구현 시작
+
+- 상태: Phase 07 `IN_PROGRESS`, 계획 `APPROVED`, Current phase Phase 07 유지
+- 승인 근거: 사용자가 수정된 Phase 07 계획을 조건부로 명시적 승인하고 내부 API, API Key, 운영 기능, 테스트와 제외 범위를 확정함
+- 시작 브랜치: `feat/blog-mvp`
+- 시작 작업 트리: 직전 Codex가 만든 Phase 07 계획서와 상태 문서 변경만 존재함
+- preflight: branch는 통과했고 알려진 Phase 07 문서 두 개가 미커밋이어서 clean-tree 검사만 실패함
+- 선행 조건: Phase 00부터 Phase 06까지 `DONE`, Phase 06 계획 `EXECUTED`
+- 조건 변경: 기존 JWT chain 삽입 대신 `/internal/**` 전용 `@Order(1)` chain과 기존 `@Order(2)` chain을 사용하고, allowlist 밖 test recipient는 403으로 처리함
+- retry 확정: 한 요청 최대 100개, 기존 Delivery만 조건부 PENDING/SKIPPED 처리하며 `retriedCount`, `skippedCount`, `hasMore`를 반환하고 provider는 HTTP 요청에서 호출하지 않음
+- 설정 확정: `INTERNAL_API_ENABLED=false` 기본, local/test도 기본 disabled이며 활성화 테스트만 32바이트 이상 dummy key를 명시함
+- 제외 유지: 댓글 삭제·수정, 게시글 쓰기, verify/PENDING Subscriber, 관리자 UI, key rotation/RBAC/OAuth/IP allowlist/Redis rate limit과 실제 운영 접근은 구현하지 않음
+- 구현 원칙: 조건부 승인 사항과 예상 파일 범위 밖 변경이 필요하면 소스 수정을 중단하고 차이를 보고함
+
+### 2026-07-31 15:12:51 KST — Phase 07 구현 완료 및 검증 시작
+
+- 상태: Phase 07 `VERIFYING`, 계획 `APPROVED`, Current phase Phase 07 유지
+- 보안: `/internal/**` 전용 `@Order(1)` stateless chain, 기존 JWT/public `@Order(2)` chain, disabled 404와 enabled API Key digest 인증을 구현함
+- API Key: UTF-8 32~1024바이트 설정 검증, 비정상 장문·복수 Header 거절, SHA-256 고정 digest와 `MessageDigest.isEqual`, fixed principal/null credentials/ROLE_INTERNAL을 적용함
+- 댓글: 내부 목록·숨김·복원 Controller, 안전한 DTO, `[from,to)`, page/size, distinct postId batch slug 조회와 기존 원자 상태 전이를 연결함
+- 뉴스레터: test send의 allowlist 403/provider 502, postId Campaign 취소, 101개 ID-only 후보 조회 후 최대 100개 기존 Delivery PENDING/SKIPPED 처리와 hasMore 응답을 구현함
+- 개인정보: 내부 요청의 key/auth/cookie/proxy/IP header, body/query/cookie/user PII를 기존 Sentry callback에서 제거하고 internal exception 응답을 원문 없는 BaseResponse로 한정함
+- 제외 확인: 공개 Controller, JWT Filter/Provider, CORS config, Campaign/Delivery Document와 index, Subscriber 상태, `build.gradle`, comment delete/edit와 post write API는 변경하지 않음
+- 예비 검증: main/test compile 성공, 신규 internal security/controller/service/repository/Sentry 대상 테스트 성공, comment/newsletter/global config 회귀 선택 테스트 성공
+- 실패 이력: 첫 대상 실행에서 빈 key 오류-message assertion과 standalone Instant 직렬화 기대 2건이 실패했으며 제품 코드 변경 없이 안전한 assertion으로 보정 후 재실행 성공
+- 다음 단계: 지정 관련 선택자, 전체 `clean test bootJar`, `git diff --check`와 금지 기능·민감정보·Security 회귀 정적 검사를 수행함
+
+### 2026-07-31 15:31:29 KST — Phase 07 검증 완료
+
+- 상태: Phase 07 `DONE`, 계획 `EXECUTED`, Current phase Phase 08 `TODO`
+- 관련 테스트: 실제 생성·수정 package에 맞춘 9개 클래스 선택자로 Phase 07 관련 80개가 failures/errors/skipped 0으로 성공함
+- 전체 검증: `bash ./gradlew clean test bootJar` `BUILD SUCCESSFUL`, 전체 421개 failures/errors/skipped 0, 60 MiB bootJar 생성 성공
+- 회귀 구성: blog 66개, comment 162개, newsletter 174개, exams 1개와 application/global test 18개가 성공함
+- 보안 검토: `/internal/**` `@Order(1)` chain, 기존 JWT/public `@Order(2)` chain, disabled 404, key 누락/오류 동일 401, SHA-256 digest 및 `MessageDigest.isEqual`, ROLE_INTERNAL과 null credentials를 확인함
+- API 검토: 댓글 목록·숨김·복원과 newsletter test/cancel/retry 여섯 endpoint만 추가하고 내부 Controller `@Hidden`, 한 요청 retry 최대 100개와 provider 미호출을 확인함
+- 개인정보 검토: key/auth/cookie/proxy/IP header와 env, request body/query/cookie 및 전체 Sentry user context를 제거하고 email/content/token/provider payload를 일반 log와 응답에 포함하지 않음
+- 정적 검증: `git diff --check` 성공, 댓글 DELETE/public PATCH, 게시글 쓰기, verify, Subscriber PENDING, old blog 하위 package, 내부 Redis rate limit과 API key hardcoding 없음
+- 공개 회귀: 기존 blog/comment/newsletter/exams와 Swagger 접근, one-click 공개 POST, CORS/CSRF/JWT/permitAll 정책을 유지하고 `build.gradle`, 공개 Controller와 Mongo Document/index를 변경하지 않음
+- 승인 계획 차이: 조건부 승인된 제품 계약과 제외 범위 차이는 없고, 장문 key/header 상한 1024바이트와 민감 요청 Sentry user context 전체 제거로 안전성을 구체화함
+- 실행 명령: 필수 문서와 source의 `sed`/`rg`, `git branch --show-current`, `git status --short`, preflight, compile 선택 test, 실제 관련 9개 클래스 test, `git diff --check`, `bash ./gradlew clean test bootJar`, XML count와 최종 정적 검색을 실행함
+- 외부 접근: 실제 MongoDB, Redis, SES, Sentry, ALB/reverse proxy, 운영 인프라와 실제 email은 호출하지 않음
+- Phase 08 이관: 실제 ALB/firewall/Security Group 접근 제한, single-key rotation 절차, Sentry outbound 및 server/proxy/CDN access log redaction, one-click path token 노출, 실제 Mongo 상태 전이, 실제 test email, 인증 실패 metric/rate limit을 검증함
+- 다음 단계: 사용자 코드 검토를 기다리며 Phase 08은 `TODO`로 유지하고 별도 승인 전 구현하지 않음

@@ -15,6 +15,7 @@ import web.tosunsaeng.domain.newsletter.domain.enums.NewsletterFailureType;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -240,15 +241,45 @@ public class NewsletterDeliveryQueryRepositoryImpl
     }
 
     @Override
-    public boolean skipFailedInactive(String deliveryId, Instant now) {
+    public List<String> findManualRetryCandidateIds(
+            String campaignId,
+            int maxAttempts,
+            int limit) {
+        if (limit < 1) {
+            throw new IllegalArgumentException("manual retry 조회 limit은 양수여야 합니다.");
+        }
+        Query query = Query.query(Criteria.where("campaignId").is(campaignId)
+                        .and("status").is(NewsletterDeliveryStatus.FAILED)
+                        .and("retryable").is(true)
+                        .and("attemptCount").lt(maxAttempts)
+                        .and("lastErrorCode")
+                        .ne(NewsletterFailureType.PROVIDER_RESULT_UNKNOWN))
+                .with(Sort.by(Sort.Order.asc("_id")))
+                .limit(limit);
+        query.fields().include("_id");
+        return mongoTemplate.find(query, NewsletterDelivery.class).stream()
+                .map(NewsletterDelivery::getId)
+                .toList();
+    }
+
+    @Override
+    public boolean skipFailedInactive(
+            String deliveryId,
+            int maxAttempts,
+            Instant now) {
         Query query = Query.query(Criteria.where("_id").is(deliveryId)
                 .and("status").is(NewsletterDeliveryStatus.FAILED)
-                .and("retryable").is(true));
+                .and("retryable").is(true)
+                .and("attemptCount").lt(maxAttempts)
+                .and("lastErrorCode")
+                .ne(NewsletterFailureType.PROVIDER_RESULT_UNKNOWN));
         Update update = new Update()
                 .set("status", NewsletterDeliveryStatus.SKIPPED)
                 .set("retryable", false)
                 .set("skippedAt", now)
                 .unset("nextRetryAt")
+                .unset("failedAt")
+                .unset("lastErrorCode")
                 .set("updatedAt", now);
         return mongoTemplate.updateFirst(query, update, NewsletterDelivery.class)
                 .getModifiedCount() == 1;

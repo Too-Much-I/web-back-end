@@ -13,6 +13,11 @@ public enum ErrorStatus implements BaseErrorCode {
     _BAD_REQUEST(HttpStatus.BAD_REQUEST, "COMMON400", "잘못된 요청입니다."),
     _UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "COMMON401", "인증이 필요합니다."),
     _FORBIDDEN(HttpStatus.FORBIDDEN, "COMMON403", "금지된 요청입니다."),
+    _NOT_FOUND(HttpStatus.NOT_FOUND, "COMMON404", "요청한 리소스를 찾을 수 없습니다."),
+    _INTERNAL_API_UNAUTHORIZED(
+            HttpStatus.UNAUTHORIZED,
+            "INTERNAL_4010",
+            "내부 API 인증에 실패했습니다."),
 
     // Member
     _MEMBER_NOT_FOUND(HttpStatus.FORBIDDEN, "MEMBER_4000", "없는 유저 입니다."),
@@ -87,7 +92,27 @@ public enum ErrorStatus implements BaseErrorCode {
     _NEWSLETTER_SUBSCRIBE_RATE_LIMITED(
             HttpStatus.TOO_MANY_REQUESTS,
             "NEWSLETTER_4290",
-            "뉴스레터 구독 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.");
+            "뉴스레터 구독 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
+    _NEWSLETTER_OPERATION_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "NEWSLETTER_4040",
+            "뉴스레터 운영 대상을 찾을 수 없습니다."),
+    _NEWSLETTER_OPERATION_CONFLICT(
+            HttpStatus.CONFLICT,
+            "NEWSLETTER_4092",
+            "현재 상태에서는 뉴스레터 운영 요청을 처리할 수 없습니다."),
+    _NEWSLETTER_TEST_RECIPIENT_FORBIDDEN(
+            HttpStatus.FORBIDDEN,
+            "NEWSLETTER_4030",
+            "허용되지 않은 테스트 발송 요청입니다."),
+    _NEWSLETTER_TEST_SEND_DISABLED(
+            HttpStatus.CONFLICT,
+            "NEWSLETTER_4093",
+            "뉴스레터 테스트 발송이 비활성화되어 있습니다."),
+    _NEWSLETTER_PROVIDER_FAILURE(
+            HttpStatus.BAD_GATEWAY,
+            "NEWSLETTER_5020",
+            "이메일 제공자 요청을 처리할 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;

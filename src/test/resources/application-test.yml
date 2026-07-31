@@ -48,3 +48,8 @@ newsletter:
     test-sending-enabled: false
     test-recipient-allowlist:
       - allowed@example.test
+
+internal:
+  api:
+    enabled: false
+    key: ""
