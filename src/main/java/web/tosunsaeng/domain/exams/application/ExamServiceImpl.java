@@ -25,6 +25,8 @@ import org.springframework.util.MultiValueMap;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,6 +37,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ExamServiceImpl implements ExamService {
+
+    private static final String MOCK_EXAM_ID = "mock_exam_004";
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner;
@@ -114,8 +118,8 @@ public class ExamServiceImpl implements ExamService {
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
         log.info("정규 모의고사 세션 생성 완료: {}", examId);
 
-        // 지정된 족보 데이터인 mock_exam_003 셋을 MongoDB에서 로드합니다.
-        MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_003")
+        // 지정된 족보 데이터인 mock_exam_004 셋을 MongoDB에서 로드합니다.
+        MockExam mockExam = mockExamRepository.findByMockExamId(MOCK_EXAM_ID)
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
 
         // 전체 문항 배열을 순회하며 문항별 다운로드용 오디오 URL 및 가이드 URL을 결합합니다.
@@ -184,7 +188,7 @@ public class ExamServiceImpl implements ExamService {
             // AI 서버 전송용 파라미터 셋과 바이너리 리소스를 폼 데이터에 적재합니다.
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("user_id", examId);
-            body.add("mock_exam_id", "mock_exam_003");
+            body.add("mock_exam_id", MOCK_EXAM_ID);
             body.add("part_number", getPartNumber(questionNumber));
             body.add("question_number", questionNumber);
             body.add("retry_count", retryCount);
@@ -264,9 +268,11 @@ public class ExamServiceImpl implements ExamService {
                 .findFirst()
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
 
-        // 파트별 세부 획득 점수의 누적 총합 연산
-        java.util.Map<String, Double> partScores = results.stream()
-                .filter(r -> r.getQuestionNumber() != null && r.getScore() != null)
+        // 재시도와 중복 콜백을 제외한 문항별 최초 채점 결과를 공통 기준으로 사용합니다.
+        List<ExamResult> initialAttemptResults = getInitialAttemptResults(results);
+
+        java.util.Map<String, Double> partScores = initialAttemptResults.stream()
+                .filter(r -> r.getScore() != null)
                 .collect(java.util.stream.Collectors.groupingBy(
                         r -> {
                             int partNum = r.getPartNumber() != null ? r.getPartNumber() : getPartNumber(r.getQuestionNumber());
@@ -278,13 +284,39 @@ public class ExamServiceImpl implements ExamService {
         // 소수점 유실 방지 및 가독성을 위한 첫째 자리 반올림 정규화를 수행합니다.
         partScores.replaceAll((part, sum) -> Math.round(sum * 10.0) / 10.0);
 
-        // 유저가 실제 풀이한 순수 문항 개수 산출 (retryCount == 0 이거나 null 체크, 종합요약 문서 제외)
-        long totalSolvedQuestions = results.stream()
-                .filter(r -> r.getQuestionNumber() != null && r.getQuestionNumber() > 0)
-                .filter(r -> r.getRetryCount() != null && r.getRetryCount() == 0)
-                .count();
+        long totalSolvedQuestions = initialAttemptResults.size();
 
         return ExamConverter.toSummaryResult(summaryDoc, partScores, (int) totalSolvedQuestions);
+    }
+
+    private List<ExamResult> getInitialAttemptResults(List<ExamResult> results) {
+        Map<Integer, ExamResult> resultsByQuestion = new LinkedHashMap<>();
+
+        for (ExamResult result : results) {
+            if (!isInitialAttempt(result)) continue;
+
+            resultsByQuestion.merge(
+                    result.getQuestionNumber(),
+                    result,
+                    this::preferScoredResult
+            );
+        }
+
+        return new ArrayList<>(resultsByQuestion.values());
+    }
+
+    private boolean isInitialAttempt(ExamResult result) {
+        Integer retryCount = result.getRetryCount();
+        return result.getQuestionNumber() != null
+                && result.getQuestionNumber() > 0
+                && (retryCount == null || retryCount == 0);
+    }
+
+    private ExamResult preferScoredResult(ExamResult existing, ExamResult candidate) {
+        if (existing.getScore() == null && candidate.getScore() != null) {
+            return candidate;
+        }
+        return existing;
     }
 
     // 유저가 채점 결과를 문항 단위로 핀포인트 조회할 때, 문제 원본(MongoDB)과 AI 결과 조각, Azure 발음 분석 세션을 결합합니다.
@@ -313,7 +345,7 @@ public class ExamServiceImpl implements ExamService {
                 .findFirst()
                 .orElse(null);
 
-        MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_003")
+        MockExam mockExam = mockExamRepository.findByMockExamId(MOCK_EXAM_ID)
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
 
         // 모의고사 원본 데이터셋에서 현재 문항에 일치하는 기준 문제 엔티티를 검출합니다.
@@ -359,7 +391,7 @@ public class ExamServiceImpl implements ExamService {
             // 약속된 포맷인 0번 문항 플래그를 할당하여 AI 비동기 오케스트레이션을 수행합니다.
             java.util.Map<String, Object> body = new java.util.HashMap<>();
             body.put("user_id", examId);
-            body.put("mock_exam_id", mockExamId != null ? mockExamId : "mock_exam_003");
+            body.put("mock_exam_id", mockExamId != null ? mockExamId : MOCK_EXAM_ID);
 
             body.put("question_number", 0);
             body.put("part_number", 0);
@@ -404,7 +436,7 @@ public class ExamServiceImpl implements ExamService {
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
         log.info("맛보기(Trial) 모의고사 전용 임시 세션 생성 완료: {}", examId);
 
-        MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_003")
+        MockExam mockExam = mockExamRepository.findByMockExamId(MOCK_EXAM_ID)
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
 
         // 맛보기 세션 운영 기준에 의거하여 1번 문항 데이터만 핀포인트 추출하여 DTO 매핑
@@ -487,7 +519,7 @@ public class ExamServiceImpl implements ExamService {
                 }
 
                 // [주의] 이 메서드가 혹시 비동기 블록 바깥이나 다른 곳에서 중복으로 호출되고 있지 않은지 꼭 체크해 주세요.
-                requestOverallSummary(examId, "mock_exam_003");
+                requestOverallSummary(examId, MOCK_EXAM_ID);
                 log.info("★ [AI 서버 요청 완료] 종합 요약 피드백 생성 트리거 요청 성공: examId={}", examId);
 
             } catch (Exception e) {
