@@ -15,6 +15,8 @@ public interface BlogPostQueryRepository {
 
     Optional<BlogPost> findPublicPostBySlug(String slug, Instant now);
 
+    Optional<BlogPost> findPublicPostBySlugAndIncrementViewCount(String slug, Instant now);
+
     Page<BlogPost> searchPublicPostsByTitle(String query, Instant now, Pageable pageable);
 
     List<BlogPost> findPublicPostsBySlugs(Collection<String> slugs, Instant now);

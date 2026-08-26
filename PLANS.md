@@ -6,7 +6,7 @@
 docs/blog-mvp/plans/PHASE-XX-{name}.md
 ```
 
-`XX`는 `WORKFLOW.md`의 두 자리 단계 번호이고, `{name}`은 영문 소문자 kebab-case 이름이다. Phase 01~08 구현에 계획서가 필요하며, Phase 00은 관리 체계를 부트스트랩하는 문서 전용 단계다.
+`XX`는 `WORKFLOW.md`의 두 자리 단계 번호이고, `{name}`은 영문 소문자 kebab-case 이름이다. Phase 01~09 구현에 계획서가 필요하며, Phase 00은 관리 체계를 부트스트랩하는 문서 전용 단계다.
 
 ## 계획 상태
 

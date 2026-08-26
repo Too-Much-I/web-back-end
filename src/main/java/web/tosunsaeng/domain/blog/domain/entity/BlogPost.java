@@ -31,6 +31,7 @@ public class BlogPost {
     private List<String> relatedPostSlugs;
     private Instant publishedAt;
     private boolean newsletterEnabled;
+    private long viewCount;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -49,6 +50,7 @@ public class BlogPost {
             List<String> relatedPostSlugs,
             Instant publishedAt,
             boolean newsletterEnabled,
+            long viewCount,
             Instant createdAt,
             Instant updatedAt) {
         BlogPostSlugPolicy.validate(slug);
@@ -65,6 +67,7 @@ public class BlogPost {
         this.relatedPostSlugs = relatedPostSlugs;
         this.publishedAt = publishedAt;
         this.newsletterEnabled = newsletterEnabled;
+        this.viewCount = viewCount;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
