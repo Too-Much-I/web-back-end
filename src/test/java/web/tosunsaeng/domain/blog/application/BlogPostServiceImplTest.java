@@ -67,7 +67,8 @@ class BlogPostServiceImplTest {
     @Test
     void returnsPublicPostDetail() {
         BlogPost post = post("public-post", BlogPostStatus.PUBLISHED, NOW.minusSeconds(60), List.of());
-        when(blogPostRepository.findPublicPostBySlug("public-post", NOW)).thenReturn(Optional.of(post));
+        when(blogPostRepository.findPublicPostBySlugAndIncrementViewCount("public-post", NOW))
+                .thenReturn(Optional.of(post));
         when(blogPostRepository.findLatestPublicPostsExcluding(any(), eq(NOW), eq(3)))
                 .thenReturn(List.of());
 
@@ -76,11 +77,24 @@ class BlogPostServiceImplTest {
         assertThat(result.getSlug()).isEqualTo("public-post");
         assertThat(result.getContentMarkdown()).isEqualTo("# public-post");
         assertThat(result.getRelatedPosts()).isEmpty();
+        verify(blogPostRepository)
+                .findPublicPostBySlugAndIncrementViewCount("public-post", NOW);
+        verify(blogPostRepository, never()).findPublicPostBySlug(any(), any());
+    }
+
+    @Test
+    void rejectsReservedSlugBeforeViewCountIncrement() {
+        assertError(
+                () -> blogPostService.getPublicPost("search"),
+                ErrorStatus._BLOG_POST_NOT_FOUND);
+
+        verifyNoInteractions(blogPostRepository);
     }
 
     @Test
     void throwsNotFoundForMissingSlug() {
-        when(blogPostRepository.findPublicPostBySlug("missing", NOW)).thenReturn(Optional.empty());
+        when(blogPostRepository.findPublicPostBySlugAndIncrementViewCount("missing", NOW))
+                .thenReturn(Optional.empty());
 
         assertError(
                 () -> blogPostService.getPublicPost("missing"),
@@ -89,7 +103,8 @@ class BlogPostServiceImplTest {
 
     @Test
     void throwsSameNotFoundWhenRepositoryHidesNonPublicPost() {
-        when(blogPostRepository.findPublicPostBySlug("draft", NOW)).thenReturn(Optional.empty());
+        when(blogPostRepository.findPublicPostBySlugAndIncrementViewCount("draft", NOW))
+                .thenReturn(Optional.empty());
 
         assertError(
                 () -> blogPostService.getPublicPost("draft"),
@@ -103,7 +118,8 @@ class BlogPostServiceImplTest {
                 BlogPostStatus.PUBLISHED,
                 NOW.minusSeconds(60),
                 List.of("a", "b", "c", "d"));
-        when(blogPostRepository.findPublicPostBySlug("current", NOW)).thenReturn(Optional.of(current));
+        when(blogPostRepository.findPublicPostBySlugAndIncrementViewCount("current", NOW))
+                .thenReturn(Optional.of(current));
         when(blogPostRepository.findPublicPostsBySlugs(any(), eq(NOW)))
                 .thenReturn(List.of(post("d"), post("c"), post("b"), post("a")));
 
@@ -120,7 +136,8 @@ class BlogPostServiceImplTest {
                 BlogPostStatus.PUBLISHED,
                 NOW.minusSeconds(60),
                 List.of("current", "a"));
-        when(blogPostRepository.findPublicPostBySlug("current", NOW)).thenReturn(Optional.of(current));
+        when(blogPostRepository.findPublicPostBySlugAndIncrementViewCount("current", NOW))
+                .thenReturn(Optional.of(current));
         when(blogPostRepository.findPublicPostsBySlugs(any(), eq(NOW))).thenReturn(List.of(post("a")));
         when(blogPostRepository.findLatestPublicPostsExcluding(any(), eq(NOW), eq(2)))
                 .thenReturn(List.of());
@@ -140,7 +157,8 @@ class BlogPostServiceImplTest {
                 BlogPostStatus.PUBLISHED,
                 NOW.minusSeconds(60),
                 List.of("a", "a", "b", "a"));
-        when(blogPostRepository.findPublicPostBySlug("current", NOW)).thenReturn(Optional.of(current));
+        when(blogPostRepository.findPublicPostBySlugAndIncrementViewCount("current", NOW))
+                .thenReturn(Optional.of(current));
         when(blogPostRepository.findPublicPostsBySlugs(any(), eq(NOW)))
                 .thenReturn(List.of(post("a"), post("b"), post("b")));
         when(blogPostRepository.findLatestPublicPostsExcluding(any(), eq(NOW), eq(1)))
@@ -158,7 +176,8 @@ class BlogPostServiceImplTest {
                 BlogPostStatus.PUBLISHED,
                 NOW.minusSeconds(60),
                 List.of("a", "b", "c"));
-        when(blogPostRepository.findPublicPostBySlug("current", NOW)).thenReturn(Optional.of(current));
+        when(blogPostRepository.findPublicPostBySlugAndIncrementViewCount("current", NOW))
+                .thenReturn(Optional.of(current));
         when(blogPostRepository.findPublicPostsBySlugs(any(), eq(NOW)))
                 .thenReturn(List.of(post("c"), post("a"), post("b")));
 
@@ -174,7 +193,8 @@ class BlogPostServiceImplTest {
                 BlogPostStatus.PUBLISHED,
                 NOW.minusSeconds(60),
                 List.of("hidden", "a"));
-        when(blogPostRepository.findPublicPostBySlug("current", NOW)).thenReturn(Optional.of(current));
+        when(blogPostRepository.findPublicPostBySlugAndIncrementViewCount("current", NOW))
+                .thenReturn(Optional.of(current));
         when(blogPostRepository.findPublicPostsBySlugs(any(), eq(NOW))).thenReturn(List.of(post("a")));
         when(blogPostRepository.findLatestPublicPostsExcluding(any(), eq(NOW), eq(2)))
                 .thenReturn(List.of());
@@ -191,7 +211,8 @@ class BlogPostServiceImplTest {
                 BlogPostStatus.PUBLISHED,
                 NOW.minusSeconds(60),
                 List.of("a"));
-        when(blogPostRepository.findPublicPostBySlug("current", NOW)).thenReturn(Optional.of(current));
+        when(blogPostRepository.findPublicPostBySlugAndIncrementViewCount("current", NOW))
+                .thenReturn(Optional.of(current));
         when(blogPostRepository.findPublicPostsBySlugs(any(), eq(NOW))).thenReturn(List.of(post("a")));
         when(blogPostRepository.findLatestPublicPostsExcluding(any(), eq(NOW), eq(2)))
                 .thenReturn(List.of(post("latest-1"), post("latest-2")));
@@ -219,7 +240,7 @@ class BlogPostServiceImplTest {
     @Test
     void acceptsPostPublishedExactlyAtNowWhenRepositoryReturnsIt() {
         BlogPost boundaryPost = post("boundary", BlogPostStatus.PUBLISHED, NOW, List.of());
-        when(blogPostRepository.findPublicPostBySlug("boundary", NOW))
+        when(blogPostRepository.findPublicPostBySlugAndIncrementViewCount("boundary", NOW))
                 .thenReturn(Optional.of(boundaryPost));
         when(blogPostRepository.findLatestPublicPostsExcluding(any(), eq(NOW), eq(3)))
                 .thenReturn(List.of());

@@ -24,6 +24,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -160,6 +165,117 @@ class BlogPostMongoIntegrationTest {
                 .containsExactly("enabled");
         assertThat(blogPostRepository.findById("missing").orElseThrow()
                 .isNewsletterEnabled()).isFalse();
+    }
+
+    @Test
+    void missingViewCountReadsAsZeroAndFirstPublicDetailCreatesLongOne() {
+        Instant originalUpdatedAt = NOW.minusSeconds(30);
+        mongoTemplate.getCollection("blog_posts").insertOne(new Document()
+                .append("_id", "legacy")
+                .append("slug", "legacy-post")
+                .append("title", "기존 글")
+                .append("status", BlogPostStatus.PUBLISHED.name())
+                .append("publishedAt", Date.from(NOW.minusSeconds(60)))
+                .append("createdAt", Date.from(NOW.minusSeconds(120)))
+                .append("updatedAt", Date.from(originalUpdatedAt)));
+
+        assertThat(blogPostRepository.findById("legacy").orElseThrow().getViewCount())
+                .isZero();
+
+        BlogPost incremented = blogPostRepository
+                .findPublicPostBySlugAndIncrementViewCount("legacy-post", NOW)
+                .orElseThrow();
+
+        assertThat(incremented.getViewCount()).isEqualTo(1L);
+        Document stored = mongoTemplate.getCollection("blog_posts")
+                .find(new Document("_id", "legacy"))
+                .first();
+        assertThat(stored).isNotNull();
+        assertThat(stored.get("viewCount")).isInstanceOf(Long.class);
+        assertThat(stored.getLong("viewCount")).isEqualTo(1L);
+        assertThat(stored.getDate("updatedAt").toInstant()).isEqualTo(originalUpdatedAt);
+    }
+
+    @Test
+    void onlyPublicDetailIncrementChangesViewCount() {
+        blogPostRepository.saveAll(List.of(
+                post("public", "public-post", "공개", BlogPostStatus.PUBLISHED,
+                        NOW.minusSeconds(1), NOW.minusSeconds(10), false),
+                post("draft", "draft-post", "초안", BlogPostStatus.DRAFT,
+                        NOW.minusSeconds(1), NOW.minusSeconds(10), false),
+                post("archived", "archived-post", "보관", BlogPostStatus.ARCHIVED,
+                        NOW.minusSeconds(1), NOW.minusSeconds(10), false),
+                post("future", "future-post", "미래", BlogPostStatus.PUBLISHED,
+                        NOW.plusSeconds(1), NOW.minusSeconds(10), false),
+                post("null-date", "null-date-post", "날짜 없음", BlogPostStatus.PUBLISHED,
+                        null, NOW.minusSeconds(10), false)));
+
+        blogPostRepository.findPublicPosts(NOW, PageRequest.of(0, 10));
+        blogPostRepository.searchPublicPostsByTitle("공개", NOW, PageRequest.of(0, 10));
+        blogPostRepository.findPublicPostsBySlugs(List.of("public-post"), NOW);
+        blogPostRepository.findPublicPostBySlug("public-post", NOW);
+
+        assertThat(blogPostRepository.findById("public").orElseThrow().getViewCount())
+                .isZero();
+        assertThat(blogPostRepository
+                .findPublicPostBySlugAndIncrementViewCount("public-post", NOW)
+                .orElseThrow()
+                .getViewCount())
+                .isEqualTo(1L);
+        assertThat(blogPostRepository
+                .findPublicPostBySlugAndIncrementViewCount("missing-post", NOW))
+                .isEmpty();
+        assertThat(blogPostRepository
+                .findPublicPostBySlugAndIncrementViewCount("draft-post", NOW))
+                .isEmpty();
+        assertThat(blogPostRepository
+                .findPublicPostBySlugAndIncrementViewCount("archived-post", NOW))
+                .isEmpty();
+        assertThat(blogPostRepository
+                .findPublicPostBySlugAndIncrementViewCount("future-post", NOW))
+                .isEmpty();
+        assertThat(blogPostRepository
+                .findPublicPostBySlugAndIncrementViewCount("null-date-post", NOW))
+                .isEmpty();
+
+        assertThat(blogPostRepository.findById("public").orElseThrow().getViewCount())
+                .isEqualTo(1L);
+        assertThat(blogPostRepository.findAll())
+                .filteredOn(post -> !post.getId().equals("public"))
+                .allSatisfy(post -> assertThat(post.getViewCount()).isZero());
+    }
+
+    @Test
+    void concurrentPublicDetailIncrementsDoNotLoseUpdates() throws Exception {
+        int requestCount = 40;
+        blogPostRepository.insert(post(
+                "concurrent", "concurrent-post", "동시 조회", BlogPostStatus.PUBLISHED,
+                NOW.minusSeconds(1), NOW.minusSeconds(10), false));
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try {
+            List<Future<Boolean>> results = new ArrayList<>();
+            for (int i = 0; i < requestCount; i++) {
+                results.add(executor.submit(() -> {
+                    start.await();
+                    return blogPostRepository
+                            .findPublicPostBySlugAndIncrementViewCount("concurrent-post", NOW)
+                            .isPresent();
+                }));
+            }
+
+            start.countDown();
+            for (Future<Boolean> result : results) {
+                assertThat(result.get(10, TimeUnit.SECONDS)).isTrue();
+            }
+        } finally {
+            executor.shutdown();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+
+        assertThat(blogPostRepository.findById("concurrent").orElseThrow().getViewCount())
+                .isEqualTo(requestCount);
     }
 
     private void ensureIndexes() {

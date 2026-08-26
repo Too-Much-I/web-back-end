@@ -52,7 +52,7 @@ public class BlogPostServiceImpl implements BlogPostService {
         }
 
         Instant now = clock.instant();
-        BlogPost post = blogPostRepository.findPublicPostBySlug(slug, now)
+        BlogPost post = blogPostRepository.findPublicPostBySlugAndIncrementViewCount(slug, now)
                 .orElseThrow(() -> new BlogPostException(ErrorStatus._BLOG_POST_NOT_FOUND));
         List<BlogPost> relatedPosts = findRelatedPosts(post, now);
         return BlogPostConverter.toPostDetailResult(post, relatedPosts);

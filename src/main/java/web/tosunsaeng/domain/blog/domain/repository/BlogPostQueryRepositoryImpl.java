@@ -6,8 +6,10 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import web.tosunsaeng.domain.blog.domain.entity.BlogPost;
 import web.tosunsaeng.domain.blog.domain.enums.BlogPostStatus;
 
@@ -43,10 +45,22 @@ public class BlogPostQueryRepositoryImpl implements BlogPostQueryRepository {
 
     @Override
     public Optional<BlogPost> findPublicPostBySlug(String slug, Instant now) {
-        Criteria criteria = new Criteria().andOperator(
-                publicCriteria(now),
-                Criteria.where("slug").is(slug));
+        Criteria criteria = publicSlugCriteria(slug, now);
         return Optional.ofNullable(mongoTemplate.findOne(Query.query(criteria), BlogPost.class));
+    }
+
+    @Override
+    public Optional<BlogPost> findPublicPostBySlugAndIncrementViewCount(
+            String slug,
+            Instant now) {
+        Query query = Query.query(publicSlugCriteria(slug, now));
+        Update update = new Update().inc("viewCount", 1L);
+        FindAndModifyOptions options = FindAndModifyOptions.options().returnNew(true);
+        return Optional.ofNullable(mongoTemplate.findAndModify(
+                query,
+                update,
+                options,
+                BlogPost.class));
     }
 
     @Override
@@ -120,6 +134,12 @@ public class BlogPostQueryRepositoryImpl implements BlogPostQueryRepository {
     private Criteria publicCriteria(Instant now) {
         return Criteria.where("status").is(BlogPostStatus.PUBLISHED)
                 .and("publishedAt").exists(true).ne(null).lte(now);
+    }
+
+    private Criteria publicSlugCriteria(String slug, Instant now) {
+        return new Criteria().andOperator(
+                publicCriteria(now),
+                Criteria.where("slug").is(slug));
     }
 
     private Criteria searchCriteria(String query, Instant now) {

@@ -3,7 +3,7 @@
 - 전체 상태: `IMPLEMENTATION_COMPLETE_PENDING_OPERATIONS`
 - 현재 단계: `COMPLETE`
 - 현재 브랜치: `feat/blog-mvp`
-- 마지막 수정 시각: `2026-07-31 18:06:31 KST (+09:00)`
+- 마지막 수정 시각: `2026-08-26 15:56:43 KST (+09:00)`
 
 ## 단계별 상태
 
@@ -18,9 +18,13 @@
 | 06 | 뉴스레터 15분 자동 발송 | `DONE` |
 | 07 | 내부 운영 API와 보안 | `DONE` |
 | 08 | 전체 회귀 테스트와 API 문서 | `DONE` |
+| 09 | 게시글 조회수 내부 집계 | `DONE` |
 
 ## 현재 단계의 목표
 
+- Phase 09는 공개 게시글 상세 조회 성공 횟수를 MongoDB `viewCount`에 원자적으로 누적하되 모든 API 응답에서는 숨기는 범위를 구현·검증해 `DONE`이다.
+- `docs/blog-mvp/plans/PHASE-09-blog-post-view-count.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
+- Current phase는 다시 `COMPLETE`이며 전체 상태는 기존 운영 수동 검증 대기 상태다.
 - Phase 01은 승인 범위 구현과 필수 검증을 완료해 `DONE`이다.
 - `docs/blog-mvp/plans/PHASE-01-infrastructure.md`는 `EXECUTED`다.
 - Phase 02는 승인 범위 구현, 필수 테스트, 전체 build와 Codex review를 완료해 `DONE`이다.
@@ -38,7 +42,7 @@
 - Phase 08은 승인 범위 구현과 자동 검증을 완료해 `DONE`이다.
 - `docs/blog-mvp/plans/PHASE-08-final-verification-documentation.md`는 실제 구현 차이와 검증 결과를 기록한 `EXECUTED`다.
 - Phase 07은 댓글 조회·숨김·복원과 뉴스레터 테스트 발송·예약 취소·실패 재시도를 `/internal/**`로 노출하고 별도 우선순위 SecurityFilterChain의 API Key 인증으로 보호한다.
-- Current phase는 `COMPLETE`이며 전체 상태는 운영 수동 검증 대기 상태다.
+- Phase 08 완료 후 열린 Phase 09도 `DONE`이다. 기존 운영 수동 검증 과제는 Phase 09와 별개로 유지한다.
 - Phase 06은 DB 직접 작성 BlogPost reconciliation, 15분 예약, Campaign/Delivery unique와 원자 claim, bounded 발송, SES v2, retry, kill switch 및 RFC 8058을 구현했다.
 - 조건부 승인은 claimExpiresAt, SecureRandom token, kill switch의 상태 무변경, 개별 AWS SDK 2.29.52, public/API base URL 분리, path token one-click과 test send allowlist를 확정했다.
 - Phase 06에서는 공개 one-click unsubscribe POST를 제외한 운영 Controller, `/internal/newsletter/**`, API Key 인증과 SecurityConfig 변경을 구현하지 않는다.
@@ -50,6 +54,43 @@
 - duplicate reservation은 Mongo save 전에 owner token으로 만들고 Mongo 실패 시 owner 일치 Lua로만 해제하며 rate counter는 rollback하지 않는다.
 
 ## 변경 파일
+
+Phase 09 계획 수립에서 생성한 파일:
+
+- `docs/blog-mvp/plans/PHASE-09-blog-post-view-count.md`
+
+Phase 09 계획 수립에서 수정한 파일:
+
+- `docs/blog-mvp/REQUIREMENTS.md`
+- `docs/blog-mvp/WORKFLOW.md`
+- `docs/blog-mvp/IMPLEMENTATION_STATUS.md`
+- `PLANS.md`
+
+Phase 09 계획 수립에서 수정하지 않은 파일:
+
+- Java main/test/integrationTest 소스 전체
+- API, 운영, 배포, 보안, 테스트 문서
+- `build.gradle`, application 설정, CI와 Docker 관련 파일
+
+Phase 09 구현에서 수정한 main 파일:
+
+- `src/main/java/web/tosunsaeng/domain/blog/domain/entity/BlogPost.java`
+- `src/main/java/web/tosunsaeng/domain/blog/domain/repository/BlogPostQueryRepository.java`
+- `src/main/java/web/tosunsaeng/domain/blog/domain/repository/BlogPostQueryRepositoryImpl.java`
+- `src/main/java/web/tosunsaeng/domain/blog/application/BlogPostServiceImpl.java`
+
+Phase 09 구현에서 수정한 test 파일:
+
+- `src/test/java/web/tosunsaeng/domain/blog/domain/repository/BlogPostQueryRepositoryImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/application/BlogPostServiceImplTest.java`
+- `src/test/java/web/tosunsaeng/domain/blog/api/BlogPostRestControllerTest.java`
+- `src/integrationTest/java/web/tosunsaeng/integration/mongo/BlogPostMongoIntegrationTest.java`
+
+Phase 09 구현에서 변경하지 않은 보호 파일과 범위:
+
+- `BlogPostResponseDTO`, `BlogPostRestController`, `BlogPostConverter`와 외부 API 계약
+- comment/newsletter/exams main source
+- `build.gradle`, application/Security 설정, CI, Docker, Redis와 운영 DB/index
 
 Phase 07 계획 수립에서 변경한 파일:
 
@@ -744,6 +785,9 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 
 ## 열린 문제
 
+- Phase 09는 `DONE`이며 조회수 집계는 상세 endpoint hit count로서 새로고침·prefetch·crawler를 구분하지 않는다.
+- 한 게시글에 상세 조회가 집중되면 해당 MongoDB Document가 hot document가 될 수 있다. 현재 요구 규모에서는 정확한 원자 증가를 우선하고 별도 counter collection, Redis 집계와 비동기 flush는 범위에서 제외한다.
+
 - Java 17 기반 `Dokerfile`은 참조되지 않는 것으로 확인됐지만 이번 Phase에서는 삭제하지 않는다.
 - 기존 exams의 기능 수준 회귀 테스트가 없어 Phase 01 계획의 보장 범위는 context 기동과 Repository Bean 등록까지다.
 - test context가 localhost MongoClient를 생성해 background monitor의 연결 거부 로그가 남지만 Repository method를 호출하거나 연결 성공을 요구하지 않으며 테스트는 통과한다.
@@ -1389,3 +1433,52 @@ Phase 00 시작 전부터 존재한 사용자 변경이며 수정하지 않는 �
 - 미실행 외부 작업: 운영 MongoDB·Redis·AWS·SES·Sentry·ALB·Security Group에 접근하지 않았고 실제 이메일, registry push와 배포를 수행하지 않음
 - 남은 운영 검증: SES identity/DKIM/sandbox/quota와 실제 Gmail one-click, Sentry outbound, ALB/proxy/CDN access log, 내부 API network boundary, frontend avatar manifest, API key rotation rehearsal와 실제 GitHub Actions 성공 증적
 - 완료 판단: 코드 Phase 완료 조건은 충족했지만 위 운영 수동 검증 전에는 운영 출시 승인 또는 배포 준비 완료로 간주하지 않음
+
+### 2026-08-26 15:42:14 KST — Phase 09 DRAFT 계획 수립
+
+- 상태: Phase 09 `AWAITING_APPROVAL`, 계획 `DRAFT`
+- 사용자 합의: 조회수는 MongoDB에만 저장하고 공개 API 응답에는 노출하지 않는 신규 요구사항을 문서화함
+- 집계 기준: 상세 API 요청에서 공개 게시글을 성공적으로 찾을 때마다 1회 집계하며 로그인, cookie, IP 기반 중복 제거는 하지 않음
+- 원자성: 공개 조건과 slug를 포함한 MongoDB `findAndModify`와 `$inc`를 계획해 동시 요청의 증가 유실을 방지함
+- 기존 데이터: `viewCount` 누락을 0으로 읽고 첫 증가에서 1로 생성하는 무중단 호환 방식을 계획함
+- 격리 범위: 댓글 공개 여부 확인에서 재사용하는 기존 `findPublicPostBySlug`는 증가시키지 않고 상세 API 전용 Repository 메서드를 분리함
+- 제외 범위: DTO/API 변경, 조회수 공개·조회 운영 API, 방문자 식별·중복 제거, Redis/비동기 집계와 기존 데이터 일괄 backfill은 계획하지 않음
+- 변경 파일: 요구사항, Workflow, Plans, 구현 상태와 Phase 09 DRAFT 계획서만 변경하고 Java 및 테스트 소스는 수정하지 않음
+- 확인 명령: 필수 문서 순서 재독, `git branch --show-current`, `git status --short`, blog entity/repository/service/DTO와 unit/integration test 정적 분석, `rg`, `sed`, `date`, `git diff --check`를 사용함
+
+### 2026-08-26 15:50:20 KST — Phase 09 계획 승인 및 구현 시작
+
+- 상태: Phase 09 `IN_PROGRESS`, 계획 `APPROVED`
+- 승인 근거: 사용자가 `Phase 09 계획 승인`이라고 명시적으로 승인함
+- 승인 범위: `BlogPost.viewCount`, 상세 API 전용 MongoDB 원자 증가 Repository 메서드, 상세 Service 연결과 계획서에 열거한 unit/contract/integration test
+- 보호 범위: DTO·Controller·Converter와 comment/newsletter/exams main source, 설정·보안·CI·Docker·Redis 및 운영 DB는 변경하지 않음
+- 작업 트리: Phase 09 계획 수립에서 만든 문서 변경만 존재하며 다른 사용자 변경은 없음
+- 다음 단계: 승인된 main/test 파일 구현 후 관련 테스트와 전체 필수 검증을 수행함
+
+### 2026-08-26 15:53:20 KST — Phase 09 구현 완료 및 검증 시작
+
+- 상태: Phase 09 `VERIFYING`, 계획 `APPROVED`
+- main 구현: `BlogPost` primitive long `viewCount`, 상세 전용 `findPublicPostBySlugAndIncrementViewCount`, 공개 Criteria 기반 `findAndModify`와 `$inc: 1L`, 상세 Service 연결을 완료함
+- 부작용 격리: 댓글 등에서 사용하는 `findPublicPostBySlug`는 read-only로 유지하고 목록·검색·관련 글·뉴스레터 경로를 변경하지 않음
+- API 계약: DTO·Controller·Converter는 변경하지 않고 Controller test에 상세 JSON의 `viewCount` 부재 assertion만 추가함
+- 기존 데이터: 누락 필드는 Java에서 0으로 읽고 첫 원자 증가 시 BSON int64 1로 생성하며 `updatedAt`은 바꾸지 않음
+- 예비 단위 검증: Repository/Service/Controller 대상 테스트 `BUILD SUCCESSFUL`
+- 예비 통합 검증: MongoDB 7.0에서 누락 필드, 공개 조건, read-only 경로, 비공개 미증가와 동시 40회 증가 유실 방지 테스트 `BUILD SUCCESSFUL`
+- 환경 이력: 최초 sandbox Gradle 실행은 사용자 Gradle wrapper lock 접근 거부로 실패했고 승인된 escalated 실행에서는 정상 성공함
+- 다음 단계: 전체 `clean test integrationTest bootJar`, diff/API/요구사항 정적 검수 후 성공 시에만 `DONE`/`EXECUTED`로 전환함
+
+### 2026-08-26 15:56:43 KST — Phase 09 검증 완료
+
+- 최종 상태: Phase 09 `DONE`, 계획 `EXECUTED`, Current phase `COMPLETE`, 전체 `IMPLEMENTATION_COMPLETE_PENDING_OPERATIONS`
+- unit/contract 검증: 전체 446개 failures/errors/skipped 0
+- 실제 통합 검증: MongoDB 7.0과 Redis 7.2-alpine Testcontainers 전체 35개 failures/errors/skipped 0
+- build 검증: `./gradlew clean test bootJar`, `./gradlew integrationTest`, `./gradlew clean test integrationTest bootJar` 모두 `BUILD SUCCESSFUL`, 약 60 MiB 실행 JAR 생성
+- 조회수 검증: 누락 필드 Java 0 호환과 첫 조회 BSON int64 1 생성, 공개 Criteria, no-upsert, `updatedAt` 불변, 비공개·미존재·다른 조회 경로 미증가 확인
+- 동시성 검증: 동일 공개 글의 동시 40회 증가가 손실 없이 정확히 40으로 누적됨
+- API 검증: DTO·Controller·Converter에 조회수 노출 없음, 기존 method/path/status/JSON 계약 유지, 신규 endpoint 없음
+- 범위 검토: 승인된 main/test/관리 문서만 변경하고 comment/newsletter/exams main source, 설정·보안·CI·Docker·Redis·운영 DB/index는 변경하지 않음
+- 정적 검증: `git diff --check` 성공, 조회수 참조는 entity/repository/service 및 승인된 test에만 존재함
+- 환경 이력: 최초 sandbox Gradle wrapper lock 접근 실패 뒤 사용자 승인된 실행 환경에서 모든 테스트와 build가 성공함
+- 승인 계획 차이: 제품 기능, API, DB, 상태 전이, 파일 범위 차이 없음
+- 남은 위험: 한 게시글의 극단적 트래픽은 MongoDB hot-document contention이 될 수 있고 집계값에는 새로고침·prefetch·crawler가 포함됨
+- 외부 제한: 운영 MongoDB나 인프라에 접근하지 않았고 배포·외부 전송을 수행하지 않음

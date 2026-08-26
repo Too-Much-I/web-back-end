@@ -7,8 +7,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import web.tosunsaeng.domain.blog.domain.entity.BlogPost;
 import web.tosunsaeng.domain.blog.domain.enums.BlogPostStatus;
 
@@ -134,6 +136,42 @@ class BlogPostQueryRepositoryImplTest {
         assertThat(clauses.get(0).get("status")).isEqualTo(BlogPostStatus.PUBLISHED);
         assertPublishedAtCriteria(clauses.get(0));
         assertThat(clauses.get(1)).containsEntry("slug", "public-post");
+    }
+
+    @Test
+    void detailViewCountIncrementUsesPublicSlugCriteriaAndOnlyAtomicIncrement() {
+        when(mongoTemplate.findAndModify(
+                any(Query.class),
+                any(Update.class),
+                any(FindAndModifyOptions.class),
+                eq(BlogPost.class)))
+                .thenReturn(null);
+        BlogPostQueryRepositoryImpl repository = new BlogPostQueryRepositoryImpl(mongoTemplate);
+
+        assertThat(repository.findPublicPostBySlugAndIncrementViewCount("public-post", NOW))
+                .isEmpty();
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.forClass(Update.class);
+        ArgumentCaptor<FindAndModifyOptions> optionsCaptor =
+                ArgumentCaptor.forClass(FindAndModifyOptions.class);
+        verify(mongoTemplate).findAndModify(
+                queryCaptor.capture(),
+                updateCaptor.capture(),
+                optionsCaptor.capture(),
+                eq(BlogPost.class));
+
+        List<Document> clauses = andClauses(queryCaptor.getValue().getQueryObject());
+        assertThat(clauses.get(0).get("status")).isEqualTo(BlogPostStatus.PUBLISHED);
+        assertPublishedAtCriteria(clauses.get(0));
+        assertThat(clauses.get(1)).containsEntry("slug", "public-post");
+
+        Document update = updateCaptor.getValue().getUpdateObject();
+        assertThat(update.keySet()).containsExactly("$inc");
+        assertThat(update.get("$inc", Document.class))
+                .containsExactlyEntriesOf(new Document("viewCount", 1L));
+        assertThat(optionsCaptor.getValue().isReturnNew()).isTrue();
+        assertThat(optionsCaptor.getValue().isUpsert()).isFalse();
     }
 
     @Test

@@ -72,6 +72,7 @@ class BlogPostRestControllerTest {
                 .andExpect(jsonPath("$.result.slug").value("post-1"))
                 .andExpect(jsonPath("$.result.contentMarkdown").value("# 본문"))
                 .andExpect(jsonPath("$.result.relatedPosts[0].slug").value("related-1"))
+                .andExpect(jsonPath("$.result.viewCount").doesNotExist())
                 .andExpect(jsonPath("$.result.status").doesNotExist())
                 .andExpect(jsonPath("$.result.id").doesNotExist())
                 .andExpect(jsonPath("$.result.relatedPostSlugs").doesNotExist());
