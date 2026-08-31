@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ExamServiceImpl implements ExamService {
 
-    private static final String MOCK_EXAM_ID = "mock_exam_004";
+    private static final String MOCK_EXAM_ID = "mock_exam_001";
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner;
@@ -118,7 +118,7 @@ public class ExamServiceImpl implements ExamService {
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
         log.info("정규 모의고사 세션 생성 완료: {}", examId);
 
-        // 지정된 족보 데이터인 mock_exam_004 셋을 MongoDB에서 로드합니다.
+        // 지정된 족보 데이터인 mock_exam_001 셋을 MongoDB에서 로드합니다.
         MockExam mockExam = mockExamRepository.findByMockExamId(MOCK_EXAM_ID)
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
 

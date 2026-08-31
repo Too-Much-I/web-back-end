@@ -42,7 +42,7 @@ import static org.mockito.Mockito.when;
 class ExamServiceImplTest {
 
     private static final String EXAM_ID = "ex_tmi33";
-    private static final String MOCK_EXAM_ID = "mock_exam_004";
+    private static final String MOCK_EXAM_ID = "mock_exam_001";
 
     private RedisTemplate<String, Object> redisTemplate;
     private ValueOperations<String, Object> valueOperations;
@@ -90,7 +90,7 @@ class ExamServiceImplTest {
     }
 
     @Test
-    void createsRegularSessionFromMockExamFour() {
+    void createsRegularSessionFromMockExamOne() {
         MockExam mockExam = mockExamWith(List.of());
         when(mockExamRepository.findByMockExamId(MOCK_EXAM_ID)).thenReturn(Optional.of(mockExam));
 
@@ -103,7 +103,7 @@ class ExamServiceImplTest {
     }
 
     @Test
-    void createsTrialSessionFromMockExamFour() {
+    void createsTrialSessionFromMockExamOne() {
         Question question = Question.builder()
                 .partNumber(1)
                 .questionNumber(1)
@@ -122,7 +122,7 @@ class ExamServiceImplTest {
     }
 
     @Test
-    void loadsQuestionDetailsFromMockExamFour() {
+    void loadsQuestionDetailsFromMockExamOne() {
         Question question = Question.builder()
                 .partNumber(1)
                 .questionNumber(1)
@@ -144,7 +144,7 @@ class ExamServiceImplTest {
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
-    void sendsMockExamFourToAiForQuestionScoring() {
+    void sendsMockExamOneToAiForQuestionScoring() {
         examService.submitAudio(EXAM_ID, 1, 0);
 
         ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
@@ -161,7 +161,7 @@ class ExamServiceImplTest {
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
-    void usesMockExamFourWhenOverallSummaryRequestHasNoMockExamId() {
+    void usesMockExamOneWhenOverallSummaryRequestHasNoMockExamId() {
         ReflectionTestUtils.invokeMethod(examService, "requestOverallSummary", EXAM_ID, null);
 
         ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
