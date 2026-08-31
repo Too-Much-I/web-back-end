@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import lombok.*;
-import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 
 import java.util.List;
@@ -31,7 +30,7 @@ public class ExamResponseDTO {
         private String audioUrl;
         private String guideAudioUrl;
         private String imageUrl;
-        private Question.TableContext tableContext;
+        private Map<String, Object> tableContext;
         private Integer prepTimeSec;
         private Integer speakTimeSec;
     }

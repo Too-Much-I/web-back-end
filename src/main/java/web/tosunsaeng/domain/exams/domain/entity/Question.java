@@ -5,7 +5,7 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-import java.util.List;
+import java.util.Map;
 
 @Getter
 @Builder
@@ -40,34 +40,11 @@ public class Question {
     private String question;
 
     @Field("table_context")
-    private TableContext tableContext;
+    private Map<String, Object> tableContext;
 
     private Integer prepTimeSec;
     private Integer speakTimeSec;
 
     private String corrected_answer;
 
-    @Getter
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TableContext {
-        private String title;
-        private String location;
-        private String date;
-        private String fee;
-        private List<TableItem> items;
-    }
-
-    @Getter
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TableItem {
-        private String time;
-        @Field("session_title")
-        private String sessionTitle;
-        private String speaker;
-        private String note;
-    }
 }

@@ -103,6 +103,55 @@ class ExamServiceImplTest {
     }
 
     @Test
+    void preservesDynamicTableContextInSessionResponse() throws Exception {
+        Map<String, Object> cells = Map.of(
+                "time", "8:30 AM - 8:50 AM",
+                "activity", "Opening Remarks");
+        Map<String, Object> item = new HashMap<>();
+        item.put("cells", cells);
+        item.put("status", "scheduled");
+        item.put("status_note", null);
+        item.put("strike_through", false);
+        Map<String, Object> tableContext = new HashMap<>();
+        tableContext.put("table_type", "orientation_schedule");
+        tableContext.put("title", "Northstar Editorial Group");
+        tableContext.put("subtitles", List.of("Spring Editorial Fellows Orientation"));
+        tableContext.put("columns", List.of(Map.of(
+                "key", "time",
+                "label", "Time",
+                "value_type", "time")));
+        tableContext.put("items", List.of(item));
+        tableContext.put("notes", List.of());
+        Question question = Question.builder()
+                .partNumber(4)
+                .questionNumber(8)
+                .question("When does the first activity begin?")
+                .tableContext(tableContext)
+                .build();
+        when(mockExamRepository.findByMockExamId(MOCK_EXAM_ID))
+                .thenReturn(Optional.of(mockExamWith(List.of(question))));
+
+        ExamResponseDTO.CreateSessionResult result = examService.createExamSession();
+
+        Map<String, Object> responseTableContext =
+                result.getQuestions().getFirst().getTableContext();
+        assertThat(responseTableContext).isEqualTo(tableContext);
+        String json = new ObjectMapper().writeValueAsString(result);
+        var jsonTableContext = new ObjectMapper().readTree(json)
+                .path("questions").get(0).path("tableContext");
+        assertThat(jsonTableContext.path("table_type").asText())
+                .isEqualTo("orientation_schedule");
+        assertThat(jsonTableContext.path("items").get(0).path("cells").path("time").asText())
+                .isEqualTo("8:30 AM - 8:50 AM");
+        assertThat(jsonTableContext.path("items").get(0).path("cells").path("activity").asText())
+                .isEqualTo("Opening Remarks");
+        assertThat(jsonTableContext.path("items").get(0).path("status_note").isNull())
+                .isTrue();
+        assertThat(jsonTableContext.path("items").get(0).path("strike_through").asBoolean())
+                .isFalse();
+    }
+
+    @Test
     void createsTrialSessionFromMockExamOne() {
         Question question = Question.builder()
                 .partNumber(1)
